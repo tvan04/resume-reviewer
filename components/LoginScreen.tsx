@@ -13,13 +13,22 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(''); // <-- new state for error message
 
   const handleLogin = async (userType: 'student' | 'reviewer') => {
     setIsLoading(true);
-    
+    setError(''); // clear any previous error
+
+    // Check if email ends with @vanderbilt.edu
+    if (!email.toLowerCase().endsWith('@vanderbilt.edu')) {
+      setError('Please sign in using a valid @vanderbilt.edu email address.');
+      setIsLoading(false);
+      return;
+    }
+
     // Simulate authentication delay
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Mock authentication - in real app, this would validate credentials
     const mockUser: User = {
       id: userType === 'student' ? 'student1' : 'reviewer1',
@@ -27,7 +36,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       email: email || (userType === 'student' ? 'john.doe@vanderbilt.edu' : 'john.smith@vanderbilt.edu'),
       type: userType
     };
-    
+
     onLogin(mockUser);
     setIsLoading(false);
   };
@@ -78,6 +87,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
+                  {error && (
+                    <p className="text-red-600 text-sm">{error}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="student-password">Password</label>
@@ -126,6 +138,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
+                  {error && (
+                    <p className="text-red-600 text-sm">{error}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="reviewer-password">Password</label>
