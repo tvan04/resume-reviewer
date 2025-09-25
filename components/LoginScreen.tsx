@@ -65,8 +65,8 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
         <Tabs defaultValue="student" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="student">Student Login</TabsTrigger>
-            <TabsTrigger value="reviewer">Reviewer Login</TabsTrigger>
+            <TabsTrigger value="student" className="tab-trigger rounded-tl-lg rounded-bl-lg">Student Login</TabsTrigger>
+            <TabsTrigger value="reviewer" className="tab-trigger rounded-tr-lg rounded-br-lg">Reviewer Login</TabsTrigger>
           </TabsList>
           
           <TabsContent value="student">
@@ -102,7 +102,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   />
                 </div>
                 <Button 
-                  variant="outline"
+                  variant="default"
                   onClick={() => handleLogin('student')}
                   disabled={isLoading}
                   className="w-full"
@@ -110,7 +110,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   Log In With SSO
                 </Button>
                 <Button 
-                  variant="outline"
+                  variant="default"
                   onClick={() => handleDemoLogin('student')}
                   className="w-full"
                 >
@@ -153,7 +153,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   />
                 </div>
                 <Button 
-                  variant="outline"
+                  variant="default"
                   onClick={() => handleLogin('reviewer')}
                   disabled={isLoading}
                   className="w-full"
@@ -161,7 +161,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   Log In With SSO
                 </Button>
                 <Button 
-                  variant="outline"
+                  variant="default"
                   onClick={() => handleDemoLogin('reviewer')}
                   className="w-full"
                 >

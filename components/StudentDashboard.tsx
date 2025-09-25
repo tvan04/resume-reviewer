@@ -69,15 +69,15 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
           
           <div className="flex gap-4 mb-8">
             <Button
-              variant="secondary" 
+              variant="default"
               onClick={() => onNavigate('upload')}
-              className="bg-black text-black px-6 py-3 text-2xl"
+              className="px-6 py-3 text-2xl"
             >
               Build Resume from Template
             </Button>
             <Button 
-              variant="secondary"
-              className="bg-[#e6e6e6] text-black px-6 py-3 text-2xl"
+              variant="default"
+              className="px-6 py-3 text-2xl"
             >
               Print Uploaded Resume
             </Button>

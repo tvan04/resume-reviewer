@@ -13,49 +13,55 @@ export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
       <div className="container mx-auto flex items-center justify-between h-full px-8">
         {/* Left Section: Logo */}
         <div>
-          <button
+          <Button
+            variant="default"
             onClick={() => onNavigate(user.type === 'student' ? 'studentDashboard' : 'reviewerDashboard')}
-            className="text-xl font-semibold text-black hover:text-gray-600 transition-colors"
+            className="text-xl font-semibold"
           >
             Vanderbilt Resume Reviewer
-          </button>
+          </Button>
         </div>
 
         {/* Right Section: Navigation Links */}
         <div className="flex items-center gap-8">
-          <button
+          <Button
+            variant="default"
             onClick={() => onNavigate('studentDashboard')}
-            className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
+            className="font-medium text-lg"
           >
             About
-          </button>
+          </Button>
 
           {user.type === 'student' ? (
-            <button
+            <Button
+              variant="default"
               onClick={() => onNavigate('reviewerDashboard')}
-              className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
+              className="font-medium text-lg"
             >
               Sign in as Reviewer
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="default"
               onClick={() => onNavigate('studentDashboard')}
-              className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
+              className="font-medium text-lg"
             >
               Sign in as Student
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
+            variant="default"
             onClick={onLogout}
-            className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
+            className="font-medium text-lg"
           >
             Log Out
-          </button>
+          </Button>
 
           <Button
+            variant="default"
             onClick={() => onNavigate('account')}
-            className="bg-black text-black px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
+            className="px-6 py-3 rounded-lg"
           >
             Account
           </Button>
