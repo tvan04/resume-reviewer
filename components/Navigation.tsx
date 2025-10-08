@@ -55,7 +55,7 @@ export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
 
           <Button
             onClick={() => onNavigate('account')}
-            className="bg-black text-black px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
+            className="bg-[#e6e6e6] text-black px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
           >
             Account
           </Button>

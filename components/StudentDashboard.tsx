@@ -71,7 +71,7 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
             <Button
               variant="secondary" 
               onClick={() => onNavigate('upload')}
-              className="bg-black text-black px-6 py-3 text-2xl"
+              className="bg-[#e6e6e6] text-black px-6 py-3 text-2xl"
             >
               Build Resume from Template
             </Button>
