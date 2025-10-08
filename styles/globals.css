@@ -187,25 +187,3 @@
 html {
   font-size: var(--font-size);
 }
-
-.tab-trigger {
-  font-weight: 600;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-radius: 0.5rem 0 0 0.5rem;
-  transition: background 0.2s, color 0.2s;
-}
-
-.tab-trigger[data-state="active"],
-.tab-trigger[aria-selected="true"],
-.tab-trigger.active {
-  background: var(--color-primary);
-  color: #fff !important;
-}
-
-.tab-trigger[data-state="inactive"],
-.tab-trigger[aria-selected="false"],
-.tab-trigger:not(.active):not([aria-selected="true"]):not([data-state="active"]) {
-  background: var(--color-secondary);
-  color: var(--color-muted-foreground) !important;
-}
