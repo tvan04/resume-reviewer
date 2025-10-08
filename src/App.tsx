@@ -179,9 +179,11 @@ export default function App() {
   };
 
   const handleStatusUpdate = (resumeId: string, status: Resume['status']) => {
-    setResumes(prev => prev.map(resume => 
-      resume.id === resumeId ? { ...resume, status } : resume
-    ));
+    setResumes((prev) =>
+      prev.map((resume) =>
+        resume.id === resumeId ? { ...resume, status } : resume
+      )
+    );
   };
 
   const renderScreen = () => {
