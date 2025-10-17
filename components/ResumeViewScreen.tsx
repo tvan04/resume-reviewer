@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Navigation } from "./Navigation";
+import { useState, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { NavigationBar } from "./Navigation";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -17,100 +18,114 @@ import {
   AlertCircle,
   User as UserIcon,
 } from "lucide-react";
-import { User, Resume, Screen } from "../src/App";
 import { ImageWithFallback } from "./ImageWithFallback";
+import { User, Resume } from "../src/App";
+
+// ✅ Helper functions (kept inline)
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+const getStatusIcon = (status: Resume["status"]) => {
+  switch (status) {
+    case "pending":
+      return <Clock className="w-4 h-4" />;
+    case "in-review":
+      return <AlertCircle className="w-4 h-4" />;
+    case "reviewed":
+    case "approved":
+      return <CheckCircle className="w-4 h-4 text-green-600" />;
+    default:
+      return <FileText className="w-4 h-4" />;
+  }
+};
+
+const getStatusColor = (status: Resume["status"]) => {
+  switch (status) {
+    case "pending":
+      return "bg-yellow-100 text-yellow-800";
+    case "in-review":
+      return "bg-blue-100 text-blue-800";
+    case "reviewed":
+      return "bg-green-100 text-green-800";
+    case "approved":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
+
+const getStatusMessage = (status: Resume["status"]) => {
+  switch (status) {
+    case "pending":
+      return "Your resume is pending review.";
+    case "in-review":
+      return "Your resume is currently being reviewed.";
+    case "reviewed":
+      return "Your resume has been reviewed and is awaiting approval.";
+    case "approved":
+      return "Your resume has been approved!";
+    default:
+      return "Status unavailable.";
+  }
+};
 
 interface ResumeViewScreenProps {
   user: User;
-  resume: Resume;
-  onNavigate: (screen: Screen, resumeId?: string) => void;
+  resumes: Resume[];
 }
 
-export function ResumeViewScreen({
-  user,
-  resume,
-  onNavigate,
-}: ResumeViewScreenProps) {
+export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+
+  // 🧭 Routing helper
+  const go = (path: string) => navigate(path);
+
+  // 🔍 Find the resume by ID from props
+  const resume = useMemo(
+    () => resumes.find((r) => r.id === id),
+    [id, resumes]
+  );
+
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [selectedReviewer, setSelectedReviewer] = useState("");
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
+  if (!resume) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <p className="text-lg text-gray-600">Resume not found.</p>
+        <Button onClick={() => go("/student")} className="mt-4">
+          Back to Dashboard
+        </Button>
+      </div>
+    );
+  }
 
-  const getStatusColor = (status: Resume["status"]) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "in-review":
-        return "bg-blue-100 text-blue-800";
-      case "reviewed":
-        return "bg-green-100 text-green-800";
-      case "approved":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getStatusIcon = (status: Resume["status"]) => {
-    switch (status) {
-      case "pending":
-        return <Clock className="w-4 h-4" />;
-      case "in-review":
-        return <AlertCircle className="w-4 h-4" />;
-      case "reviewed":
-        return <CheckCircle className="w-4 h-4" />;
-      case "approved":
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
-
-  const getStatusMessage = (status: Resume["status"]) => {
-    switch (status) {
-      case "pending":
-        return "Your resume is waiting to be assigned to a reviewer.";
-      case "in-review":
-        return "Your resume is currently being reviewed. You'll be notified when feedback is available.";
-      case "reviewed":
-        return "Your resume has been reviewed! Check the comments below for feedback.";
-      case "approved":
-        return "Congratulations! Your resume has been approved and is ready for submission.";
-      default:
-        return "Resume status unknown.";
-    }
-  };
-
-  const unresolvedComments = resume.comments.filter((c) => !c.resolved);
   const resolvedComments = resume.comments.filter((c) => c.resolved);
+  const unresolvedComments = resume.comments.filter((c) => !c.resolved);
 
   return (
     <div className="min-h-screen bg-white">
-      <Navigation
-        user={user}
-        onNavigate={onNavigate}
-        onLogout={() => onNavigate("login")}
-      />
+      <NavigationBar user={user} onLogout={() => go("/login")} />
 
       <div className="px-[79px] pt-[20px] pb-16">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          {/* Header */}
           <div className="mb-8">
-            {/* Back to Dashboard Button */}
             <div className="mb-4">
               <Button
                 variant="outline"
-                onClick={() => onNavigate("studentDashboard")}
+                onClick={() =>
+                  go(user.type === "reviewer" ? "/reviewer" : "/student")
+                }
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -118,7 +133,6 @@ export function ResumeViewScreen({
               </Button>
             </div>
 
-            {/* File Name, Uploaded Date, and Status */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-black">
@@ -140,18 +154,6 @@ export function ResumeViewScreen({
               </Badge>
             </div>
           </div>
-
-          <div className="flex items-center gap-4">
-            <Badge
-              className={`${getStatusColor(
-                resume.status
-              )} flex items-center gap-1`}
-            >
-              {getStatusIcon(resume.status)}
-              {resume.status.charAt(0).toUpperCase() +
-                resume.status.slice(1).replace("-", " ")}
-            </Badge>
-          </div>
         </div>
 
         {/* Status Alert */}
@@ -169,7 +171,7 @@ export function ResumeViewScreen({
         </Alert>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Resume Viewer */}
+          {/* Resume Preview */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
@@ -206,7 +208,7 @@ export function ResumeViewScreen({
             </Card>
           </div>
 
-          {/* Info and Comments Panel */}
+          {/* Right Panel */}
           <div className="space-y-6">
             {/* Resume Info */}
             <Card>
@@ -244,43 +246,6 @@ export function ResumeViewScreen({
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
-            {resume.status === "pending" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Next Steps</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button variant="outline" className="w-full">
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share with Reviewer
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <FileText className="w-4 h-4 mr-2" />
-                    Replace Resume
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {resume.status === "approved" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Ready to Submit</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button className="w-full bg-green-600 hover:bg-green-700">
-                    <Printer className="w-4 h-4 mr-2" />
-                    Print for Career Fair
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Final Version
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Comments Section */}
             <Card>
               <CardHeader>
@@ -292,7 +257,7 @@ export function ResumeViewScreen({
               <CardContent>
                 {resume.comments.length > 0 ? (
                   <div className="space-y-4">
-                    {/* Unresolved Comments */}
+                    {/* Unresolved */}
                     {unresolvedComments.length > 0 && (
                       <div>
                         <h4 className="font-medium text-sm text-red-600 mb-3">
@@ -318,7 +283,7 @@ export function ResumeViewScreen({
                               {comment.text}
                             </p>
 
-                            {/* Student can reply */}
+                            {/* Replies */}
                             <div className="ml-4 space-y-2 border-l border-gray-200 pl-3">
                               {comment.replies.map((reply) => (
                                 <div
@@ -336,8 +301,6 @@ export function ResumeViewScreen({
                                   <p className="text-sm">{reply.text}</p>
                                 </div>
                               ))}
-
-                              {/* Reply button */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -352,7 +315,7 @@ export function ResumeViewScreen({
                       </div>
                     )}
 
-                    {/* Resolved Comments */}
+                    {/* Resolved */}
                     {resolvedComments.length > 0 && (
                       <div>
                         <h4 className="font-medium text-sm text-green-600 mb-3">
@@ -388,11 +351,6 @@ export function ResumeViewScreen({
                   <div className="text-center py-8 text-gray-500">
                     <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>No feedback yet</p>
-                    <p className="text-sm">
-                      {resume.status === "pending"
-                        ? "Share your resume with a reviewer to receive feedback"
-                        : "Feedback will appear here once your review is complete"}
-                    </p>
                   </div>
                 )}
               </CardContent>

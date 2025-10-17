@@ -1,180 +1,83 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { User } from '../src/App';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import type { User } from '../src/App';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import app from '../src/firebaseConfig';
 
 interface LoginScreenProps {
   onLogin: (user: User) => void;
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
+  const navigate = useNavigate();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(''); // <-- new state for error message
 
-  const handleLogin = async (userType: 'student' | 'reviewer') => {
-    setIsLoading(true);
-    setError(''); // clear any previous error
-
-    // Check if email ends with @vanderbilt.edu
-    if (!email.toLowerCase().endsWith('@vanderbilt.edu')) {
-      setError('Please sign in using a valid @vanderbilt.edu email address.');
-      setIsLoading(false);
+  const handleLogin = async () => {
+    setError('');
+    if (!email || !password) {
+      setError('Email and password are required.');
       return;
     }
 
-    // Simulate authentication delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Mock authentication - in real app, this would validate credentials
-    const mockUser: User = {
-      id: userType === 'student' ? 'student1' : 'reviewer1',
-      name: userType === 'student' ? 'John Doe' : 'John Smith',
-      email: email || (userType === 'student' ? 'john.doe@vanderbilt.edu' : 'john.smith@vanderbilt.edu'),
-      type: userType
-    };
-
-    onLogin(mockUser);
-    setIsLoading(false);
-  };
-
-  const handleDemoLogin = (userType: 'student' | 'reviewer') => {
-    const mockUser: User = {
-      id: userType === 'student' ? 'student1' : 'reviewer1',
-      name: userType === 'student' ? 'John Doe' : 'John Smith',
-      email: userType === 'student' ? 'john.doe@vanderbilt.edu' : 'john.smith@vanderbilt.edu',
-      type: userType
-    };
-    onLogin(mockUser);
+    setIsLoading(true);
+    try {
+      const res = await signInWithEmailAndPassword(auth, email, password);
+      const userRef = doc(db, 'users', res.user.uid);
+      const userSnap = await getDoc(userRef);
+      const role = (userSnap.exists() ? (userSnap.data().role as 'student' | 'reviewer') : 'student') || 'student';
+      const userObj: User = {
+        id: res.user.uid,
+        name: res.user.displayName ?? res.user.email?.split('@')[0] ?? '',
+        email: res.user.email ?? '',
+        type: role,
+      };
+      onLogin(userObj);
+      navigate(role === 'reviewer' ? '/reviewer' : '/student');
+    } catch (err) {
+      setError((err as Error).message || 'Login failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Vanderbilt Resume Reviewer
-          </h1>
-          <p className="text-gray-600">
-            Streamline your resume review process
-          </p>
-        </div>
-
-        <Tabs defaultValue="student" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="student" className="tab-trigger rounded-tl-lg rounded-bl-lg">Student Login</TabsTrigger>
-            <TabsTrigger value="reviewer" className="tab-trigger rounded-tr-lg rounded-br-lg">Reviewer Login</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="student">
-            <Card>
-              <CardHeader>
-                <CardTitle>Student Portal</CardTitle>
-                <CardDescription>
-                  Access your resume submissions and feedback
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="student-email">Vanderbilt Email</label>
-                  <Input
-                    id="student-email"
-                    type="email"
-                    placeholder="your.name@vanderbilt.edu"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  {error && (
-                    <p className="text-red-600 text-sm">{error}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="student-password">Password</label>
-                  <Input
-                    id="student-password"
-                    type="password"
-                    placeholder="Your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                <Button 
-                  variant="default"
-                  onClick={() => handleLogin('student')}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Log In With SSO
-                </Button>
-                <Button 
-                  variant="default"
-                  onClick={() => handleDemoLogin('student')}
-                  className="w-full"
-                >
-                  Demo as Student
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="reviewer">
-            <Card>
-              <CardHeader>
-                <CardTitle>Reviewer Portal</CardTitle>
-                <CardDescription>
-                  Career Center staff access
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="reviewer-email">Staff Email</label>
-                  <Input
-                    id="reviewer-email"
-                    type="email"
-                    placeholder="staff@vanderbilt.edu"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  {error && (
-                    <p className="text-red-600 text-sm">{error}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="reviewer-password">Password</label>
-                  <Input
-                    id="reviewer-password"
-                    type="password"
-                    placeholder="Your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                <Button 
-                  variant="default"
-                  onClick={() => handleLogin('reviewer')}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  Log In With SSO
-                </Button>
-                <Button 
-                  variant="default"
-                  onClick={() => handleDemoLogin('reviewer')}
-                  className="w-full"
-                >
-                  Demo as Reviewer
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Secure authentication powered by Vanderbilt SSO</p>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Login</CardTitle>
+            <CardDescription>Enter your email and password</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <div>
+              <label>Email</label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div>
+              <label>Password</label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleLogin} disabled={isLoading}>
+                {isLoading ? 'Logging in...' : 'Login'}
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/register')}>
+                Register
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

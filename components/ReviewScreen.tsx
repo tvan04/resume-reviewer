@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Navigation } from './Navigation';
+import { useNavigate, useParams } from 'react-router-dom';
+import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
@@ -22,20 +23,22 @@ import {
   Download,
   Printer
 } from 'lucide-react';
-import { User, Resume, Comment, Screen } from '../src/App';
 import { ImageWithFallback } from './ImageWithFallback';
+import { User, Resume, Comment } from '../src/App';
 
 interface ReviewScreenProps {
   user: User;
   resume: Resume;
   onAddComment: (resumeId: string, comment: Omit<Comment, 'id' | 'createdAt' | 'replies'>) => void;
   onStatusUpdate: (resumeId: string, status: Resume['status']) => void;
-  onNavigate: (screen: Screen, resumeId?: string) => void;
 }
 
-export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate, onNavigate }: ReviewScreenProps) {
+export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: ReviewScreenProps) {
   const [newComment, setNewComment] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<Resume['status']>(resume.status);
+
+  const navigate = useNavigate();
+  const { id } = useParams();
 
   const handleAddComment = () => {
     if (newComment.trim()) {
@@ -43,7 +46,7 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate, onNav
         text: newComment.trim(),
         authorId: user.id,
         authorName: user.name,
-        resolved: false
+        resolved: false,
       });
       setNewComment('');
     }
@@ -54,16 +57,15 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate, onNav
     onStatusUpdate(resume.id, status);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleString('en-US', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
-      minute: '2-digit'
+      minute: '2-digit',
     });
-  };
 
   const getStatusColor = (status: Resume['status']) => {
     switch (status) {
@@ -82,15 +84,15 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate, onNav
 
   return (
     <div className="min-h-screen bg-white">
-      <Navigation user={user} onNavigate={onNavigate} onLogout={() => onNavigate('login')} />
+      <NavigationBar user={user} onLogout={() => navigate('/login')} />
       
-      <div className="px-[79px] pt-[212px] pb-16">
+      <div className="px-[79px] pt-[20px] pb-16">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
-              onClick={() => onNavigate('reviewerDashboard')}
+              onClick={() => navigate('/reviewerDashboard')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -240,7 +242,7 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate, onNav
                           )}
                         </div>
                         <p className="text-sm mb-3">{comment.text}</p>
-                        
+
                         {/* Replies */}
                         {comment.replies.length > 0 && (
                           <div className="ml-4 space-y-2 border-l border-gray-200 pl-3">

@@ -1,17 +1,17 @@
 import React, { useState, useCallback } from "react";
-import { Navigation } from "./Navigation";
+import { useNavigate } from "react-router-dom";
+import { NavigationBar } from "./Navigation";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { Alert, AlertDescription } from "./ui/alert";
 import { FileText, X, CheckCircle, AlertCircle } from "lucide-react";
-import { User, Resume, Screen } from "../src/App";
+import { User, Resume } from "../src/App";
 import svgPaths from "../public/svg";
 
 interface UploadScreenProps {
   user: User;
   onUpload: (resume: Omit<Resume, "id" | "uploadDate" | "version">) => void;
-  onNavigate: (screen: Screen, resumeId?: string) => void;
 }
 
 interface UploadFile {
@@ -21,43 +21,37 @@ interface UploadFile {
   error?: string;
 }
 
-export function UploadScreen({
-  user,
-  onUpload,
-  onNavigate,
-}: UploadScreenProps) {
+export function UploadScreen({ user, onUpload }: UploadScreenProps) {
+  const navigate = useNavigate();
+
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // ---------------- Validation ----------------
   const validateFile = (file: File): string | undefined => {
-    // Check file type
     if (file.type !== "application/pdf") {
       return "Only PDF files are supported. Please convert your resume to PDF format.";
     }
-
-    // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       return "File size must be less than 10MB.";
     }
-
-    return undefined; // Return undefined instead of null
+    return undefined;
   };
 
+  // ---------------- File Handling ----------------
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
-
     const newFiles: UploadFile[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const error = validateFile(file);
-
       newFiles.push({
         file,
         progress: 0,
         status: error ? "error" : "uploading",
-        error, // This is now compatible with `string | undefined`
+        error,
       });
     }
 
@@ -75,20 +69,21 @@ export function UploadScreen({
       // Simulate upload progress
       for (let progress = 0; progress <= 100; progress += 10) {
         await new Promise((resolve) => setTimeout(resolve, 100));
-
         setUploadFiles((prev) =>
-          prev.map((f) => (f.file === uploadFile.file ? { ...f, progress } : f))
+          prev.map((f) =>
+            f.file === uploadFile.file ? { ...f, progress } : f
+          )
         );
       }
 
-      // Mark as complete
+      // Mark upload complete
       setUploadFiles((prev) =>
         prev.map((f) =>
           f.file === uploadFile.file ? { ...f, status: "success" } : f
         )
       );
 
-      // Create resume record
+      // Add new resume record
       const resumeData: Omit<Resume, "id" | "uploadDate" | "version"> = {
         fileName: uploadFile.file.name,
         studentId: user.id,
@@ -96,18 +91,18 @@ export function UploadScreen({
         status: "pending",
         comments: [],
       };
-
       onUpload(resumeData);
     }
 
     setIsUploading(false);
 
-    // Clear files after 2 seconds
+    // Navigate to dashboard after upload
     setTimeout(() => {
-      setUploadFiles([]);
+      navigate("/dashboard");
     }, 2000);
   };
 
+  // ---------------- Drag & Drop ----------------
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);
@@ -128,13 +123,10 @@ export function UploadScreen({
     setUploadFiles((prev) => prev.filter((f) => f.file !== fileToRemove));
   };
 
+  // ---------------- Render ----------------
   return (
     <div className="min-h-screen bg-white">
-      <Navigation
-        user={user}
-        onNavigate={onNavigate}
-        onLogout={() => onNavigate("login")}
-      />
+      <NavigationBar user={user} onLogout={() => navigate("/login")} />
 
       <div className="px-[79px] pt-[20px] pb-16 ">
         <div className="max-w-2xl mx-auto">
@@ -148,7 +140,7 @@ export function UploadScreen({
             </p>
           </div>
 
-          {/* Upload Area */}
+          {/* Upload Card */}
           <Card className="mb-8">
             <CardContent className="p-8">
               <div className="text-center mb-6">
@@ -157,16 +149,13 @@ export function UploadScreen({
                 </h2>
               </div>
 
-              {/* Drag and Drop Area */}
+              {/* Drag and Drop */}
               <div
-                className={`
-                  border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer
-                  ${
-                    isDragOver
-                      ? "border-blue-400 bg-blue-50"
-                      : "border-[rgba(8,133,134,0.3)] bg-[rgba(208,252,253,0.05)]"
-                  }
-                `}
+                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
+                  isDragOver
+                    ? "border-blue-400 bg-blue-50"
+                    : "border-[rgba(8,133,134,0.3)] bg-[rgba(208,252,253,0.05)]"
+                }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -212,16 +201,12 @@ export function UploadScreen({
                   </svg>
                 </div>
 
-                <div className="mb-4">
-                  <p className="text-[16px] font-semibold text-[#454545]">
-                    <span className="text-[#454545]">
-                      Drag & drop files or{" "}
-                    </span>
-                    <span className="text-neutral-700 underline">Browse</span>
-                  </p>
-                </div>
+                <p className="text-[16px] font-semibold text-[#454545]">
+                  Drag & drop files or{" "}
+                  <span className="text-neutral-700 underline">Browse</span>
+                </p>
 
-                <p className="text-[12px] text-[#676767]">
+                <p className="text-[12px] text-[#676767] mt-2">
                   Supported formats: PDF only
                 </p>
               </div>
@@ -235,7 +220,7 @@ export function UploadScreen({
                 onChange={(e) => handleFileSelect(e.target.files)}
               />
 
-              {/* File List */}
+              {/* Upload Status List */}
               {uploadFiles.length > 0 && (
                 <div className="mt-8 space-y-4">
                   <h3 className="text-[14px] font-semibold text-[#676767]">
@@ -281,10 +266,7 @@ export function UploadScreen({
                       )}
 
                       {uploadFile.status === "uploading" && (
-                        <Progress
-                          value={uploadFile.progress}
-                          className="mt-2"
-                        />
+                        <Progress value={uploadFile.progress} className="mt-2" />
                       )}
                     </div>
                   ))}
@@ -309,15 +291,10 @@ export function UploadScreen({
             <CardContent className="p-6">
               <h3 className="font-semibold mb-4">Upload Instructions</h3>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li>
-                  • Only PDF files are accepted to ensure consistent formatting
-                </li>
+                <li>• Only PDF files are accepted to ensure consistent formatting</li>
                 <li>• Maximum file size is 10MB</li>
                 <li>• You can upload multiple versions of your resume</li>
-                <li>
-                  • After uploading, you can share your resume with career
-                  advisors
-                </li>
+                <li>• After uploading, you can share your resume with career advisors</li>
                 <li>• Receive feedback and comments directly on your resume</li>
               </ul>
             </CardContent>

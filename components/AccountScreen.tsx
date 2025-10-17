@@ -1,5 +1,7 @@
+// ...existing code...
 import { useState } from 'react';
-import { Navigation } from './Navigation';
+import { useNavigate } from 'react-router-dom';
+import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -18,15 +20,15 @@ import {
   Save,
   Settings
 } from 'lucide-react';
-import { User, Screen } from '../src/App';
+import { User } from '../src/App';
 
 interface AccountScreenProps {
   user: User;
-  onNavigate: (screen: Screen) => void;
   onLogout: () => void;
 }
 
-export function AccountScreen({ user, onNavigate, onLogout }: AccountScreenProps) {
+export function AccountScreen({ user, onLogout }: AccountScreenProps) {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState(user);
   const [notifications, setNotifications] = useState({
@@ -38,28 +40,36 @@ export function AccountScreen({ user, onNavigate, onLogout }: AccountScreenProps
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSave = () => {
-    // In real app, this would make API call to update user
     setIsEditing(false);
-    // Show success message
+    // Optionally show a success message
   };
 
   const handleDeleteAccount = () => {
-    // In real app, this would make API call to delete account
     setShowDeleteConfirm(false);
     onLogout();
+    navigate('/login'); // redirect to login after deletion
+  };
+
+  // remove custom onNavigate usage — use react-router directly
+  const goToDashboard = () => {
+    if (user.type === 'reviewer') navigate('/reviewer');
+    else navigate('/student');
   };
 
   return (
     <div className="min-h-screen bg-white">
-      <Navigation user={user} onNavigate={onNavigate} onLogout={onLogout} />
+      <NavigationBar 
+        user={user} 
+        onLogout={onLogout} 
+      />
       
-      <div className="px-[79px] pt-[212px] pb-16">
+      <div className="px-[79px] pt-[20px] pb-16">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
-              onClick={() => onNavigate(user.type === 'student' ? 'studentDashboard' : 'reviewerDashboard')}
+              onClick={goToDashboard}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />

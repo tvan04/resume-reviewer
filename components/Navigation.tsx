@@ -1,13 +1,35 @@
+// ...existing code...
 import { Button } from './ui/button';
-import { User, Screen } from '../src/App';
+import { User } from '../src/App';
+import { useNavigate } from 'react-router-dom';
 
 interface NavigationProps {
   user: User;
-  onNavigate: (screen: Screen) => void;
   onLogout: () => void;
 }
 
-export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
+export function NavigationBar({ user, onLogout }: NavigationProps) {
+  const navigate = useNavigate();
+
+  const go = (screen: string) => {
+    switch (screen) {
+      case 'login':
+        navigate('/login');
+        break;
+      case 'studentDashboard':
+        navigate('/student');
+        break;
+      case 'reviewerDashboard':
+        navigate('/reviewer');
+        break;
+      case 'account':
+        navigate('/account');
+        break;
+      default:
+        navigate('/');
+    }
+  };
+
   return (
     <nav className="bg-white h-[164px] w-full">
       <div className="container mx-auto flex items-center justify-between h-full px-8">
@@ -15,7 +37,7 @@ export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
         <div>
           <Button
             variant="default"
-            onClick={() => onNavigate(user.type === 'student' ? 'studentDashboard' : 'reviewerDashboard')}
+            onClick={() => go(user?.type === 'student' ? 'studentDashboard' : 'reviewerDashboard')}
             className="text-xl font-semibold"
           >
             Vanderbilt Resume Reviewer
@@ -26,16 +48,16 @@ export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
         <div className="flex items-center gap-8">
           <Button
             variant="default"
-            onClick={() => onNavigate('studentDashboard')}
+            onClick={() => go('studentDashboard')}
             className="font-medium text-lg"
           >
             About
           </Button>
 
-          {user.type === 'student' ? (
+          {user?.type === 'student' ? (
             <Button
               variant="default"
-              onClick={() => onNavigate('reviewerDashboard')}
+              onClick={() => go('reviewerDashboard')}
               className="font-medium text-lg"
             >
               Sign in as Reviewer
@@ -43,7 +65,7 @@ export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
           ) : (
             <Button
               variant="default"
-              onClick={() => onNavigate('studentDashboard')}
+              onClick={() => go('studentDashboard')}
               className="font-medium text-lg"
             >
               Sign in as Student
@@ -60,7 +82,7 @@ export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
 
           <Button
             variant="default"
-            onClick={() => onNavigate('account')}
+            onClick={() => go('account')}
             className="px-6 py-3 rounded-lg"
           >
             Account
@@ -70,3 +92,4 @@ export function Navigation({ user, onNavigate, onLogout }: NavigationProps) {
     </nav>
   );
 }
+// ...existing code...
