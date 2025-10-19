@@ -60,6 +60,7 @@ export function ReviewerDashboard({ user, resumes, onLogout }: ReviewerDashboard
     (r) => r.status === "in-review" && r.reviewerId === user.id
   );
   const newSubmissions = resumes.filter((r) => r.status === "pending");
+  const approvedResumes = resumes.filter((r) => r.status === "approved");
 
   return (
     <div className="min-h-screen bg-white">
@@ -128,7 +129,7 @@ export function ReviewerDashboard({ user, resumes, onLogout }: ReviewerDashboard
           </section>
         )}
 
-        {/* Newly Submitted Resumes */}
+        {/* Newly Submitted Resumes Section */}
         <section>
           <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
             Newly Submitted Resumes
@@ -182,6 +183,22 @@ export function ReviewerDashboard({ user, resumes, onLogout }: ReviewerDashboard
               </p>
             </div>
           )}
+        </section>
+
+        {/* Approved Resumes Section */}
+        <section>
+          <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
+            Approved Resumes
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {approvedResumes.map((resume) => (
+              <Card key={resume.id} className="cursor-pointer">
+                <CardContent>
+                  <p className="font-medium text-sm">{resume.fileName}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </section>
 
         {/* Quick Stats */}

@@ -76,8 +76,8 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
               Build Resume from Template
             </Button>
             <Button 
-              variant="default"
-              className="px-6 py-3 text-2xl"
+              variant="secondary"
+              className="bg-[#e6e6e6] text-black px-6 py-3 text-2xl"
             >
               Print Uploaded Resume
             </Button>
