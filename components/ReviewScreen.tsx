@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -38,7 +38,6 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: Rev
   const [selectedStatus, setSelectedStatus] = useState<Resume['status']>(resume.status);
 
   const navigate = useNavigate();
-  const { id } = useParams();
 
   const handleAddComment = () => {
     if (newComment.trim()) {
@@ -150,13 +149,35 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: Rev
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
-                  <ImageWithFallback
-                    src="/placeholder-resume-full.png"
-                    alt={resume.fileName}
-                    className="max-w-full max-h-full object-contain"
-                  />
-                </div>
+                {resume.downloadURL ? (
+                  <div className="bg-gray-100 min-h-[800px] rounded-lg overflow-hidden">
+                    <object
+                      data={resume.downloadURL}
+                      type="application/pdf"
+                      width="100%"
+                      height="800"
+                      aria-label={resume.fileName}
+                    >
+                      <div className="p-6 text-center">
+                        <p className="text-sm text-gray-600 mb-4">
+                          Your browser does not support inline PDFs.{" "}
+                          <a href={resume.downloadURL} target="_blank" rel="noreferrer" className="underline">
+                            Open the resume in a new tab
+                          </a>
+                          .
+                        </p>
+                      </div>
+                    </object>
+                  </div>
+                ) : (
+                  <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
+                    <ImageWithFallback
+                      src="/placeholder-resume-full.png"
+                      alt={resume.fileName}
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
