@@ -92,7 +92,7 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: Rev
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
-              onClick={() => navigate('/reviewerDashboard')}
+              onClick={() => navigate('/reviewer')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />

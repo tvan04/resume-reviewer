@@ -36,7 +36,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
         {/* Left Section: Logo */}
         <div>
           <button
-            onClick={() => onNavigate(user.type === 'student' ? 'studentDashboard' : 'reviewerDashboard')}
+            onClick={() => go(user.type === 'student' ? 'studentDashboard' : 'reviewerDashboard')}
             className="text-xl font-semibold text-black hover:text-gray-600 transition-colors"
           >
             Vanderbilt Resume Reviewer
@@ -51,7 +51,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
             className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
           >
             About
-          </button>
+          </Button>
 
           {user?.type === 'student' ? (
             <Button
@@ -60,7 +60,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
               className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
             >
               Sign in as Reviewer
-            </button>
+            </Button>
           ) : (
             <Button
               variant="default"
@@ -68,7 +68,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
               className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
             >
               Sign in as Student
-            </button>
+            </Button>
           )}
 
           <button

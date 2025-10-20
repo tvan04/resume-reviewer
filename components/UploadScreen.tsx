@@ -98,7 +98,7 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
     // Navigate to dashboard after upload
     setTimeout(() => {
-      navigate("/dashboard");
+      navigate("/student");
     }, 2000);
   };
 
