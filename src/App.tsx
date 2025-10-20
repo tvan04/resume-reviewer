@@ -36,6 +36,8 @@ export interface Resume {
   reviewerName?: string;
   comments: Comment[];
   version: number;
+  downloadURL: string;
+  storagePath: string;
 }
 
 export interface Comment {
@@ -58,40 +60,7 @@ export interface Reply {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [resumes, setResumes] = useState<Resume[]>([
-    {
-      id: "1",
-      fileName: "John_Doe_Resume_v1.pdf",
-      studentId: "student1",
-      studentName: "John Doe",
-      uploadDate: "2025-01-01T12:00:00Z",
-      status: "pending",
-      comments: [],
-      version: 1,
-    },
-    {
-      id: "2",
-      fileName: "John_Doe_Resume_v2.pdf",
-      studentId: "student1",
-      studentName: "John Doe",
-      uploadDate: "2025-01-02T10:30:00Z",
-      status: "in-review",
-      reviewerId: "reviewer1",
-      reviewerName: "John Smith",
-      comments: [
-        {
-          id: "c1",
-          text: "Consider adding more specific metrics to your achievements.",
-          authorId: "reviewer1",
-          authorName: "John Smith",
-          createdAt: "2025-01-02T14:00:00Z",
-          resolved: false,
-          replies: [],
-        },
-      ],
-      version: 2,
-    },
-  ]);
+  const [resumes, setResumes] = useState<Resume[]>([]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);

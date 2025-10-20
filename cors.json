@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["http://localhost:5173", "https://resume-reviewer-d6d4b.web.app"],
+    "method": ["GET", "POST", "PUT", "HEAD"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Authorization"]
+  }
+]

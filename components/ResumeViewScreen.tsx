@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { NavigationBar } from "./Navigation";
 import { Button } from "./ui/button";
@@ -20,8 +20,9 @@ import {
 } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { User, Resume } from "../src/App";
+import app from "../src/firebaseConfig";
+import { getFirestore, doc as fsDoc, getDoc } from "firebase/firestore";
 
-// ✅ Helper functions (kept inline)
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString("en-US", {
     month: "short",
@@ -54,7 +55,6 @@ const getStatusColor = (status: Resume["status"]) => {
     case "in-review":
       return "bg-blue-100 text-blue-800";
     case "reviewed":
-      return "bg-green-100 text-green-800";
     case "approved":
       return "bg-green-100 text-green-800";
     default:
@@ -79,29 +79,83 @@ const getStatusMessage = (status: Resume["status"]) => {
 
 interface ResumeViewScreenProps {
   user: User;
-  resumes: Resume[];
+  resumes: Resume[]; // still accepted for fallback
 }
 
 export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const db = getFirestore(app);
 
-  // 🧭 Routing helper
+  // try to load resume from Firestore by id; fall back to props list
+  const [fsResume, setFsResume] = useState<Resume | null>(null);
+  const [loading, setLoading] = useState<boolean>(!!id);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setFsResume(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(null);
+
+    const ref = fsDoc(db, "resumes", id);
+    getDoc(ref)
+      .then((snap) => {
+        if (!snap.exists()) {
+          setFsResume(null);
+        } else {
+          const data = snap.data() as any;
+          setFsResume({
+            id: data.id ?? snap.id,
+            fileName: data.fileName ?? "Untitled",
+            studentId: data.studentId ?? "",
+            studentName: data.studentName ?? "",
+            uploadDate: data.uploadDate ?? new Date().toISOString(),
+            status: data.status ?? "pending",
+            reviewerId: data.reviewerId ?? undefined,
+            reviewerName: data.reviewerName ?? undefined,
+            comments: (data.comments ?? []) as any[],
+            version: data.version ?? 1,
+            downloadURL: data.downloadURL,
+            storagePath: data.storagePath,
+            // preserve any other fields
+            ...data,
+          } as Resume);
+        }
+      })
+      .catch((err) => {
+        console.error("[ResumeViewScreen] failed to load resume", err);
+        setLoadError((err as any)?.message || "Failed to load resume");
+        setFsResume(null);
+      })
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // fallback: find resume from passed props if Firestore result missing
+  const resumeFromProps = useMemo(() => resumes.find((r) => r.id === id), [id, resumes]);
+
+  const resume: Resume | null = fsResume ?? resumeFromProps ?? null;
+
   const go = (path: string) => navigate(path);
 
-  // 🔍 Find the resume by ID from props
-  const resume = useMemo(
-    () => resumes.find((r) => r.id === id),
-    [id, resumes]
-  );
-
-  const [showShareDialog, setShowShareDialog] = useState(false);
-  const [selectedReviewer, setSelectedReviewer] = useState("");
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-600">Loading resume…</p>
+      </div>
+    );
+  }
 
   if (!resume) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
         <p className="text-lg text-gray-600">Resume not found.</p>
+        {loadError && <p className="text-sm text-red-600 mt-2">{loadError}</p>}
         <Button onClick={() => go("/student")} className="mt-4">
           Back to Dashboard
         </Button>
@@ -123,9 +177,7 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
             <div className="mb-4">
               <Button
                 variant="outline"
-                onClick={() =>
-                  go(user.type === "reviewer" ? "/reviewer" : "/student")
-                }
+                onClick={() => (user.type === "reviewer" ? go("/reviewer") : go("/student"))}
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -135,22 +187,13 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
 
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-black">
-                  {resume.fileName}
-                </h1>
-                <p className="text-lg text-gray-600">
-                  Uploaded {formatDate(resume.uploadDate)}
-                </p>
+                <h1 className="text-3xl font-bold text-black">{resume.fileName}</h1>
+                <p className="text-lg text-gray-600">Uploaded {formatDate(resume.uploadDate)}</p>
               </div>
 
-              <Badge
-                className={`${getStatusColor(
-                  resume.status
-                )} flex items-center gap-1`}
-              >
+              <Badge className={`${getStatusColor(resume.status)} flex items-center gap-1`}>
                 {getStatusIcon(resume.status)}
-                {resume.status.charAt(0).toUpperCase() +
-                  resume.status.slice(1).replace("-", " ")}
+                {resume.status.charAt(0).toUpperCase() + resume.status.slice(1).replace("-", " ")}
               </Badge>
             </div>
           </div>
@@ -171,7 +214,7 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
         </Alert>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Resume Preview */}
+          {/* Resume Preview: embed actual PDF when available */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
@@ -181,29 +224,61 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                     Resume Preview
                   </CardTitle>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Printer className="w-4 h-4 mr-2" />
-                      Print
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Share2 className="w-4 h-4 mr-2" />
-                      Share
-                    </Button>
+                    {resume.downloadURL ? (
+                      <>
+                        <a href={resume.downloadURL} target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm">
+                            <Download className="w-4 h-4 mr-2" />
+                            Download
+                          </Button>
+                        </a>
+                        <a href={resume.downloadURL} target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm">
+                            <Printer className="w-4 h-4 mr-2" />
+                            Print
+                          </Button>
+                        </a>
+                        <Button variant="outline" size="sm" onClick={() => navigator.clipboard?.writeText(resume.downloadURL)}>
+                          <Share2 className="w-4 h-4 mr-2" />
+                          Copy Link
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Download</Button>
+                        <Button variant="outline" size="sm"><Printer className="w-4 h-4 mr-2" />Print</Button>
+                        <Button variant="outline" size="sm"><Share2 className="w-4 h-4 mr-2" />Share</Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
-                  <ImageWithFallback
-                    src="/placeholder-resume-full.png"
-                    alt={resume.fileName}
-                    className="max-w-full max-h-full object-contain"
-                  />
-                </div>
+                {resume.downloadURL ? (
+                  <div className="bg-gray-100 min-h-[800px] rounded-lg overflow-hidden">
+                    <object
+                      data={resume.downloadURL}
+                      type="application/pdf"
+                      width="100%"
+                      height="800"
+                      aria-label={resume.fileName}
+                    >
+                      <div className="p-6 text-center">
+                        <p className="text-sm text-gray-600 mb-4">
+                          Your browser does not support inline PDFs.{" "}
+                          <a href={resume.downloadURL} target="_blank" rel="noreferrer" className="underline">
+                            Open the resume in a new tab
+                          </a>
+                          .
+                        </p>
+                      </div>
+                    </object>
+                  </div>
+                ) : (
+                  <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
+                    <ImageWithFallback src="/placeholder-resume-full.png" alt={resume.fileName} className="max-w-full max-h-full object-contain" />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -223,8 +298,7 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Status</p>
                   <Badge className={`${getStatusColor(resume.status)} text-xs`}>
-                    {resume.status.charAt(0).toUpperCase() +
-                      resume.status.slice(1).replace("-", " ")}
+                    {resume.status.charAt(0).toUpperCase() + resume.status.slice(1).replace("-", " ")}
                   </Badge>
                 </div>
                 <div>
@@ -237,9 +311,7 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                 </div>
                 {resume.reviewerName && (
                   <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Reviewer
-                    </p>
+                    <p className="text-sm font-medium text-gray-600">Reviewer</p>
                     <p className="text-sm">{resume.reviewerName}</p>
                   </div>
                 )}
@@ -257,89 +329,47 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
               <CardContent>
                 {resume.comments.length > 0 ? (
                   <div className="space-y-4">
-                    {/* Unresolved */}
                     {unresolvedComments.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm text-red-600 mb-3">
-                          Action Required ({unresolvedComments.length})
-                        </h4>
+                        <h4 className="font-medium text-sm text-red-600 mb-3">Action Required ({unresolvedComments.length})</h4>
                         {unresolvedComments.map((comment) => (
-                          <div
-                            key={comment.id}
-                            className="border-l-4 border-red-200 pl-4 mb-4"
-                          >
+                          <div key={comment.id} className="border-l-4 border-red-200 pl-4 mb-4">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <p className="font-medium text-sm flex items-center gap-2">
-                                  <UserIcon className="w-3 h-3" />
-                                  {comment.authorName}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {formatDate(comment.createdAt)}
-                                </p>
+                                <p className="font-medium text-sm flex items-center gap-2"><UserIcon className="w-3 h-3" />{comment.authorName}</p>
+                                <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
                               </div>
                             </div>
-                            <p className="text-sm mb-3 bg-red-50 p-3 rounded">
-                              {comment.text}
-                            </p>
+                            <p className="text-sm mb-3 bg-red-50 p-3 rounded">{comment.text}</p>
 
-                            {/* Replies */}
                             <div className="ml-4 space-y-2 border-l border-gray-200 pl-3">
                               {comment.replies.map((reply) => (
-                                <div
-                                  key={reply.id}
-                                  className="bg-blue-50 p-2 rounded"
-                                >
+                                <div key={reply.id} className="bg-blue-50 p-2 rounded">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-medium text-xs">
-                                      {reply.authorName}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                      {formatDate(reply.createdAt)}
-                                    </p>
+                                    <p className="font-medium text-xs">{reply.authorName}</p>
+                                    <p className="text-xs text-gray-500">{formatDate(reply.createdAt)}</p>
                                   </div>
                                   <p className="text-sm">{reply.text}</p>
                                 </div>
                               ))}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-xs"
-                              >
-                                <Send className="w-3 h-3 mr-1" />
-                                Reply
-                              </Button>
+                              <Button variant="outline" size="sm" className="text-xs"><Send className="w-3 h-3 mr-1" />Reply</Button>
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
 
-                    {/* Resolved */}
                     {resolvedComments.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm text-green-600 mb-3">
-                          Resolved ({resolvedComments.length})
-                        </h4>
+                        <h4 className="font-medium text-sm text-green-600 mb-3">Resolved ({resolvedComments.length})</h4>
                         {resolvedComments.map((comment) => (
-                          <div
-                            key={comment.id}
-                            className="border-l-2 border-green-200 pl-4 mb-4 opacity-75"
-                          >
+                          <div key={comment.id} className="border-l-2 border-green-200 pl-4 mb-4 opacity-75">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <p className="font-medium text-sm flex items-center gap-2">
-                                  <UserIcon className="w-3 h-3" />
-                                  {comment.authorName}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {formatDate(comment.createdAt)}
-                                </p>
+                                <p className="font-medium text-sm flex items-center gap-2"><UserIcon className="w-3 h-3" />{comment.authorName}</p>
+                                <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
                               </div>
-                              <Badge variant="secondary" className="text-xs">
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                Resolved
-                              </Badge>
+                              <Badge variant="secondary" className="text-xs"><CheckCircle className="w-3 h-3 mr-1" />Resolved</Badge>
                             </div>
                             <p className="text-sm">{comment.text}</p>
                           </div>
@@ -365,12 +395,8 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
                     <div>
-                      <p className="text-sm font-medium">
-                        v{resume.version} (Current)
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {formatDate(resume.uploadDate)}
-                      </p>
+                      <p className="text-sm font-medium">v{resume.version} (Current)</p>
+                      <p className="text-xs text-gray-600">{formatDate(resume.uploadDate)}</p>
                     </div>
                     <Badge variant="secondary">Latest</Badge>
                   </div>
