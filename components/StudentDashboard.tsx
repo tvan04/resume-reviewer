@@ -1,19 +1,20 @@
-import { Navigation } from './Navigation';
+import { useNavigate } from 'react-router-dom';
+import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Plus, FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { User, Resume, Screen } from '../src/App';
+import { User, Resume } from '../src/App';
 import { ImageWithFallback } from './ImageWithFallback';
 
 interface StudentDashboardProps {
   user: User;
   resumes: Resume[];
-  onNavigate: (screen: Screen, resumeId?: string) => void;
-  onLogout: () => void;
 }
 
-export function StudentDashboard({ user, resumes, onNavigate, onLogout }: StudentDashboardProps) {
+export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
+  const navigate = useNavigate();
+
   const getStatusIcon = (status: Resume['status']) => {
     switch (status) {
       case 'pending':
@@ -36,7 +37,6 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
       case 'in-review':
         return 'bg-blue-100 text-blue-800';
       case 'reviewed':
-        return 'bg-green-100 text-green-800';
       case 'approved':
         return 'bg-green-100 text-green-800';
       default:
@@ -58,8 +58,8 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
 
   return (
     <div className="min-h-screen bg-white">
-      <Navigation user={user} onNavigate={onNavigate} onLogout={onLogout} />
-      
+      <NavigationBar user={user} onLogout={() => navigate('/login')} />
+
       <div className="px-[79px] pt-[20px] pb-16">
         {/* Welcome Section */}
         <div className="mb-12">
@@ -69,9 +69,9 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
           
           <div className="flex gap-4 mb-8">
             <Button
-              variant="secondary" 
-              onClick={() => onNavigate('upload')}
-              className="bg-[#e6e6e6] text-black px-6 py-3 text-2xl"
+              variant="default"
+              onClick={() => navigate('/upload')}
+              className="px-6 py-3 text-2xl"
             >
               Build Resume from Template
             </Button>
@@ -95,7 +95,7 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
               <Card 
                 key={resume.id}
                 className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                onClick={() => onNavigate('resumeView', resume.id)}
+                onClick={() => navigate(`/resume/${resume.id}`)}
               >
                 <CardContent className="p-0">
                   <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
@@ -124,7 +124,7 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
             {/* Upload New Card */}
             <Card 
               className="cursor-pointer hover:shadow-lg transition-shadow border border-black border-dashed"
-              onClick={() => onNavigate('upload')}
+              onClick={() => navigate('/upload')}
             >
               <CardContent className="p-0">
                 <div className="h-64 border-b border-black border-dashed flex items-center justify-center">
@@ -153,7 +153,7 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
                 <Card 
                   key={resume.id}
                   className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                  onClick={() => onNavigate('resumeView', resume.id)}
+                  onClick={() => navigate(`/resume/${resume.id}`)}
                 >
                   <CardContent className="p-0">
                     <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
@@ -197,7 +197,7 @@ export function StudentDashboard({ user, resumes, onNavigate, onLogout }: Studen
                 <Card 
                   key={resume.id}
                   className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                  onClick={() => onNavigate('resumeView', resume.id)}
+                  onClick={() => navigate(`/resume/${resume.id}`)}
                 >
                   <CardContent className="p-0">
                     <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">

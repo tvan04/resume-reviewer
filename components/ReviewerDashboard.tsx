@@ -1,23 +1,20 @@
-import { Navigation } from "./Navigation";
+import { useNavigate } from "react-router-dom";
+import { NavigationBar } from "./Navigation";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Clock, CheckCircle, AlertCircle, FileText } from "lucide-react";
-import { User, Resume, Screen } from "../src/App";
+import { User, Resume } from "../src/App";
 import { ImageWithFallback } from "./ImageWithFallback";
 
 interface ReviewerDashboardProps {
   user: User;
   resumes: Resume[];
-  onNavigate: (screen: Screen, resumeId?: string) => void;
   onLogout: () => void;
 }
 
-export function ReviewerDashboard({
-  user,
-  resumes,
-  onNavigate,
-  onLogout,
-}: ReviewerDashboardProps) {
+export function ReviewerDashboard({ user, resumes, onLogout }: ReviewerDashboardProps) {
+  const navigate = useNavigate();
+
   const getStatusIcon = (status: Resume["status"]) => {
     switch (status) {
       case "pending":
@@ -67,7 +64,7 @@ export function ReviewerDashboard({
 
   return (
     <div className="min-h-screen bg-white">
-      <Navigation user={user} onNavigate={onNavigate} onLogout={onLogout} />
+      <NavigationBar user={user} onLogout={onLogout} />
 
       <div className="px-[79px] pt-[20px] pb-16">
         {/* Welcome Section */}
@@ -80,7 +77,7 @@ export function ReviewerDashboard({
           </p>
         </div>
 
-        {/* Resumes in Progress Section */}
+        {/* Resumes in Progress */}
         {resumesInProgress.length > 0 && (
           <section className="mb-16">
             <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
@@ -92,7 +89,7 @@ export function ReviewerDashboard({
                 <Card
                   key={resume.id}
                   className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                  onClick={() => onNavigate("review", resume.id)}
+                  onClick={() => navigate(`/review/${resume.id}`)}
                 >
                   <CardContent className="p-0">
                     <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
@@ -112,9 +109,7 @@ export function ReviewerDashboard({
                       <p className="text-xs text-gray-600">
                         Submitted: {formatDateTime(resume.uploadDate)}
                       </p>
-                      <Badge
-                        className={`mt-2 ${getStatusColor(resume.status)}`}
-                      >
+                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                         <span className="flex items-center gap-1">
                           {getStatusIcon(resume.status)}
                           In Progress
@@ -146,7 +141,7 @@ export function ReviewerDashboard({
                 <Card
                   key={resume.id}
                   className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                  onClick={() => onNavigate("review", resume.id)}
+                  onClick={() => navigate(`/review/${resume.id}`)}
                 >
                   <CardContent className="p-0">
                     <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
@@ -166,9 +161,7 @@ export function ReviewerDashboard({
                       <p className="text-xs text-gray-600">
                         Submitted: {formatDateTime(resume.uploadDate)}
                       </p>
-                      <Badge
-                        className={`mt-2 ${getStatusColor(resume.status)}`}
-                      >
+                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                         <span className="flex items-center gap-1">
                           {getStatusIcon(resume.status)}
                           Pending Review
