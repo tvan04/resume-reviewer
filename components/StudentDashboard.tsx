@@ -1,3 +1,5 @@
+// ...existing code...
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
@@ -6,14 +8,85 @@ import { Badge } from './ui/badge';
 import { Plus, FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { User, Resume } from '../src/App';
 import { ImageWithFallback } from './ImageWithFallback';
+import app from '../src/firebaseConfig';
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  QuerySnapshot,
+  DocumentData,
+} from 'firebase/firestore';
 
 interface StudentDashboardProps {
   user: User;
-  resumes: Resume[];
+  resumes: Resume[]; // kept for backward compatibility; Firestore results take precedence
 }
 
-export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
+export function StudentDashboard({ user, resumes: propResumes }: StudentDashboardProps) {
   const navigate = useNavigate();
+  const db = getFirestore(app);
+
+  const [fsResumes, setFsResumes] = useState<Resume[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user || !user.id) {
+      setFsResumes([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setFetchError(null);
+
+    try {
+      // query resumes for the current student, newest first
+      const q = query(
+        collection(db, 'resumes'),
+        where('studentId', '==', user.id),
+      );
+
+      const unsub = onSnapshot(
+        q,
+        (snapshot: QuerySnapshot<DocumentData>) => {
+          const items: Resume[] = snapshot.docs.map((doc) => {
+            const data = doc.data() as any;
+            return {
+              id: data.id ?? doc.id,
+              fileName: data.fileName ?? 'Untitled',
+              studentId: data.studentId ?? user.id,
+              studentName: data.studentName ?? user.name,
+              uploadDate: data.uploadDate ?? new Date().toISOString(),
+              status: data.status ?? 'pending',
+              reviewerId: data.reviewerId ?? undefined,
+              reviewerName: data.reviewerName ?? undefined,
+              comments: (data.comments ?? []) as any[],
+              version: data.version ?? 1,
+              // keep any extra fields for downstream usage
+              ...data,
+            } as Resume;
+          });
+          setFsResumes(items);
+          setLoading(false);
+        },
+        (err) => {
+          console.error('[StudentDashboard] failed to subscribe to resumes', err);
+          setFetchError((err as any)?.message || 'Failed to load resumes');
+          setLoading(false);
+        }
+      );
+
+      return () => unsub();
+    } catch (err) {
+      console.error('[StudentDashboard] unexpected error fetching resumes', err);
+      setFetchError((err as any)?.message || 'Failed to load resumes');
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, user?.id]);
 
   const getStatusIcon = (status: Resume['status']) => {
     switch (status) {
@@ -52,9 +125,12 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
     });
   };
 
-  const yourResumes = resumes.filter(r => r.status === 'pending');
-  const submittedResumes = resumes.filter(r => r.status === 'in-review');
-  const reviewedResumes = resumes.filter(r => ['reviewed', 'approved'].includes(r.status));
+  // Prefer Firestore results if available, otherwise fall back to prop
+  const allResumes = fsResumes ?? propResumes ?? [];
+
+  const yourResumes = allResumes.filter(r => r.status === 'pending');
+  const submittedResumes = allResumes.filter(r => r.status === 'in-review');
+  const reviewedResumes = allResumes.filter(r => ['reviewed', 'approved'].includes(r.status));
 
   return (
     <div className="min-h-screen bg-white">
@@ -66,7 +142,7 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
           <h1 className="text-[64px] font-bold text-black tracking-[-1.28px] leading-normal mb-6">
             Welcome, {user.name}
           </h1>
-          
+
           <div className="flex gap-4 mb-8">
             <Button
               variant="default"
@@ -75,7 +151,7 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
             >
               Build Resume from Template
             </Button>
-            <Button 
+            <Button
               variant="secondary"
               className="bg-[#e6e6e6] text-black px-6 py-3 text-2xl"
             >
@@ -84,15 +160,19 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
           </div>
         </div>
 
+        {/* optional loading / error */}
+        {loading && <p className="mb-6 text-gray-500">Loading your resumes…</p>}
+        {fetchError && <p className="mb-6 text-red-600">Error: {fetchError}</p>}
+
         {/* Your Resumes Section */}
         <section className="mb-16">
           <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
             Your Resumes
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {yourResumes.map((resume) => (
-              <Card 
+              <Card
                 key={resume.id}
                 className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
                 onClick={() => navigate(`/resume/${resume.id}`)}
@@ -120,9 +200,9 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
                 </CardContent>
               </Card>
             ))}
-            
+
             {/* Upload New Card */}
-            <Card 
+            <Card
               className="cursor-pointer hover:shadow-lg transition-shadow border border-black border-dashed"
               onClick={() => navigate('/upload')}
             >
@@ -147,10 +227,10 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
             <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
               Submitted For Review
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {submittedResumes.map((resume) => (
-                <Card 
+                <Card
                   key={resume.id}
                   className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
                   onClick={() => navigate(`/resume/${resume.id}`)}
@@ -191,10 +271,10 @@ export function StudentDashboard({ user, resumes }: StudentDashboardProps) {
             <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
               Reviewed Resumes
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {reviewedResumes.map((resume) => (
-                <Card 
+                <Card
                   key={resume.id}
                   className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
                   onClick={() => navigate(`/resume/${resume.id}`)}

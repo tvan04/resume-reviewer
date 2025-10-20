@@ -8,6 +8,14 @@ import { Alert, AlertDescription } from "./ui/alert";
 import { FileText, X, CheckCircle, AlertCircle } from "lucide-react";
 import { User, Resume } from "../src/App";
 import svgPaths from "../public/svg";
+import app from "../src/firebaseConfig";
+import { getFirestore, collection, doc, setDoc } from "firebase/firestore";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytesResumable,
+  getDownloadURL,
+} from "firebase/storage";
 
 interface UploadScreenProps {
   user: User;
@@ -23,6 +31,8 @@ interface UploadFile {
 
 export function UploadScreen({ user, onUpload }: UploadScreenProps) {
   const navigate = useNavigate();
+  const db = getFirestore(app);
+  const storage = getStorage(app);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
@@ -30,7 +40,7 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
   // ---------------- Validation ----------------
   const validateFile = (file: File): string | undefined => {
-    if (file.type !== "application/pdf") {
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       return "Only PDF files are supported. Please convert your resume to PDF format.";
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -39,9 +49,10 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
     return undefined;
   };
 
-  // ---------------- File Handling ----------------
+  // ---------------- File Handling (with Firebase) ----------------
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
+    console.debug("[UploadScreen] selected files:", files.length);
     const newFiles: UploadFile[] = [];
 
     for (let i = 0; i < files.length; i++) {
@@ -57,49 +68,142 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
     setUploadFiles(newFiles);
 
-    if (newFiles.some((f) => !f.error)) {
-      startUpload(newFiles.filter((f) => !f.error));
+    const valid = newFiles.filter((f) => f.status === "uploading");
+    if (valid.length > 0) {
+      startUpload(valid);
     }
   };
 
   const startUpload = async (validFiles: UploadFile[]) => {
+    if (!user) {
+      setUploadFiles((prev) =>
+        prev.map((f) =>
+          validFiles.find((v) => v.file === f.file)
+            ? { ...f, status: "error", error: "You must be signed in to upload." }
+            : f
+        )
+      );
+      console.warn("[UploadScreen] upload blocked: no user signed in");
+      return;
+    }
+
     setIsUploading(true);
 
     for (const uploadFile of validFiles) {
-      // Simulate upload progress
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      const file = uploadFile.file;
+
+      try {
+        // create a new document ref with an auto id
+        const docRef = doc(collection(db, "resumes"));
+        const resumeId = docRef.id;
+        console.debug("[UploadScreen] creating resume doc", { resumeId, fileName: file.name, userId: user.id });
+
+        const path = `resumes/${resumeId}/${file.name}`;
+        const sRef = storageRef(storage, path);
+        const task = uploadBytesResumable(sRef, file);
+
+        // listen for progress
+        task.on(
+          "state_changed",
+          (snapshot) => {
+            const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            setUploadFiles((prev) =>
+              prev.map((f) => (f.file === file ? { ...f, progress } : f))
+            );
+          },
+          (error) => {
+            // upload error
+            console.error("[UploadScreen] storage upload error", { file: file.name, error });
+            setUploadFiles((prev) =>
+              prev.map((f) =>
+                f.file === file ? { ...f, status: "error", error: (error as any)?.message || String(error) } : f
+              )
+            );
+          },
+          async () => {
+            // upload complete
+            try {
+              const downloadURL = await getDownloadURL(sRef);
+              console.debug("[UploadScreen] file uploaded, downloadURL obtained", { file: file.name, downloadURL });
+
+              // build firestore document
+              const resumeDoc = {
+                id: resumeId,
+                fileName: file.name,
+                studentId: user.id,
+                studentName: user.name,
+                uploadDate: new Date().toISOString(),
+                status: "pending",
+                reviewerId: null,
+                reviewerName: null,
+                comments: [] as any[],
+                version: 1,
+                storagePath: path,
+                downloadURL,
+              };
+
+              // write to Firestore
+              try {
+                await setDoc(docRef, resumeDoc as any);
+                console.debug("[UploadScreen] resume doc written", { resumeId });
+              } catch (writeErr) {
+                console.error("[UploadScreen] failed to write resume doc to Firestore", { resumeId, file: file.name, writeErr });
+                setUploadFiles((prev) =>
+                  prev.map((f) =>
+                    f.file === file ? { ...f, status: "error", error: (writeErr as any)?.message || "Failed to write resume metadata" } : f
+                  )
+                );
+                return;
+              }
+
+              // update UI state for this file
+              setUploadFiles((prev) =>
+                prev.map((f) =>
+                  f.file === file ? { ...f, status: "success", progress: 100 } : f
+                )
+              );
+
+              // notify parent (keeps backward compatibility)
+              const payload: Omit<Resume, "id" | "uploadDate" | "version"> = {
+                fileName: file.name,
+                studentId: user.id,
+                studentName: user.name,
+                status: "pending",
+                comments: [],
+                downloadURL,
+                storagePath: path,
+              };
+              try {
+                onUpload(payload);
+              } catch (callbackErr) {
+                console.error("[UploadScreen] onUpload callback threw", { callbackErr });
+              }
+            } catch (err) {
+              console.error("[UploadScreen] error obtaining download URL or processing upload completion", { file: file.name, err });
+              setUploadFiles((prev) =>
+                prev.map((f) =>
+                  f.file === file ? { ...f, status: "error", error: (err as any)?.message || "Upload completion failed" } : f
+                )
+              );
+            }
+          }
+        );
+      } catch (outerErr) {
+        console.error("[UploadScreen] unexpected error during upload setup", { file: file.name, outerErr });
         setUploadFiles((prev) =>
           prev.map((f) =>
-            f.file === uploadFile.file ? { ...f, progress } : f
+            f.file === file ? { ...f, status: "error", error: (outerErr as any)?.message || "Upload failed" } : f
           )
         );
       }
-
-      // Mark upload complete
-      setUploadFiles((prev) =>
-        prev.map((f) =>
-          f.file === uploadFile.file ? { ...f, status: "success" } : f
-        )
-      );
-
-      // Add new resume record
-      const resumeData: Omit<Resume, "id" | "uploadDate" | "version"> = {
-        fileName: uploadFile.file.name,
-        studentId: user.id,
-        studentName: user.name,
-        status: "pending",
-        comments: [],
-      };
-      onUpload(resumeData);
     }
 
     setIsUploading(false);
 
-    // Navigate to dashboard after upload
+    // Navigate to dashboard after a short delay so user can see result
     setTimeout(() => {
       navigate("/student");
-    }, 2000);
+    }, 1500);
   };
 
   // ---------------- Drag & Drop ----------------
@@ -116,7 +220,11 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    handleFileSelect(e.dataTransfer.files);
+    try {
+      handleFileSelect(e.dataTransfer.files);
+    } catch (err) {
+      console.error("[UploadScreen] error handling drop event", err);
+    }
   }, []);
 
   const removeFile = (fileToRemove: File) => {
