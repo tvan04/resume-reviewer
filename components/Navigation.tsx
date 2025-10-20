@@ -48,7 +48,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
           <Button
             variant="default"
             onClick={() => go('studentDashboard')}
-            className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
+            className="font-medium text-lg text-black bg-white hover:bg-gray-200 transition-colors"
           >
             About
           </Button>
@@ -57,7 +57,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
             <Button
               variant="default"
               onClick={() => go('reviewerDashboard')}
-              className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
+              className="font-medium text-lg text-black bg-white hover:bg-gray-200 transition-colors"
             >
               Sign in as Reviewer
             </Button>
@@ -65,7 +65,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
             <Button
               variant="default"
               onClick={() => go('studentDashboard')}
-              className="font-medium text-lg text-black hover:text-gray-600 transition-colors"
+              className="font-medium text-lg text-black bg-white hover:bg-gray-200 transition-colors"
             >
               Sign in as Student
             </Button>
@@ -81,7 +81,7 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
           <Button
             variant="default"
             onClick={() => go('account')}
-            className="bg-[#e6e6e6] text-black px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
+            className="bg-[#e6e6e6] font-medium text-lg text-black hover:bg-white transition-colors"
           >
             Account
           </Button>
@@ -90,4 +90,3 @@ export function NavigationBar({ user, onLogout }: NavigationProps) {
     </nav>
   );
 }
-// ...existing code...
