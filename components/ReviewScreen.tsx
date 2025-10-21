@@ -25,8 +25,13 @@ import {
 } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 import { User, Resume, Comment } from '../src/App';
-import app from '../src/firebaseConfig';
-import { getFirestore, doc as fsDoc, getDoc } from 'firebase/firestore';
+import {
+  addCommentToResume,
+  subscribeToResume,
+  editCommentInResume,
+  deleteCommentFromResume,
+  updateResumeStatus,
+} from './resumeRepo';
 
 interface ReviewScreenProps {
   user: User;
@@ -34,94 +39,107 @@ interface ReviewScreenProps {
   onStatusUpdate: (resumeId: string, status: Resume['status']) => void;
 }
 
-export function ReviewScreen({ user, onAddComment, onStatusUpdate }: ReviewScreenProps) {
+export function ReviewScreen({
+  user,
+  onAddComment: _onAddComment, // unused, we write directly to Firestore
+  onStatusUpdate: _onStatusUpdate, // unused, we write directly to Firestore
+}: ReviewScreenProps) {
   const [newComment, setNewComment] = useState('');
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const db = getFirestore(app);
 
   const [fsResume, setFsResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState<boolean>(!!id);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<Resume['status']>('pending');
 
+  // For editing reviewer comments
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+
   useEffect(() => {
-    let mounted = true;
+    let unsub: (() => void) | undefined;
+
     if (!id) {
       setLoading(false);
-      return;
+      setLoadError('No resume id');
+    } else {
+      setLoading(true);
+      setLoadError(null);
+
+      unsub = subscribeToResume(
+        id,
+        (loaded) => {
+          setFsResume(loaded);
+          setSelectedStatus(loaded?.status ?? 'pending');
+          setLoading(false);
+        },
+        (err) => {
+          setLoadError(err);
+          setFsResume(null);
+          setLoading(false);
+        }
+      );
     }
 
-    setLoading(true);
-    setLoadError(null);
-
-    const ref = fsDoc(db, 'resumes', id);
-    getDoc(ref)
-      .then((snap) => {
-        if (!mounted) return;
-        if (!snap.exists()) {
-          setFsResume(null);
-          setLoadError('Resume not found');
-        } else {
-          const data = snap.data() as any;
-          const loaded: Resume = {
-            id: data.id ?? snap.id,
-            fileName: data.fileName ?? 'Untitled',
-            studentId: data.studentId ?? '',
-            studentName: data.studentName ?? '',
-            uploadDate: data.uploadDate ?? new Date().toISOString(),
-            status: data.status ?? 'pending',
-            reviewerId: data.reviewerId ?? undefined,
-            reviewerName: data.reviewerName ?? undefined,
-            comments: (data.comments ?? []) as any[],
-            version: data.version ?? 1,
-            downloadURL: data.downloadURL,
-            storagePath: data.storagePath,
-            ...data,
-          };
-          setFsResume(loaded);
-          setSelectedStatus(loaded.status);
-        }
-      })
-      .catch((err) => {
-        console.error('[ReviewScreen] failed to load resume', err);
-        if (!mounted) return;
-        setLoadError((err as any)?.message || 'Failed to load resume');
-        setFsResume(null);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
     return () => {
-      mounted = false;
+      if (unsub) unsub();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, db]);
+  }, [id]);
 
   const resume = fsResume;
 
-  useEffect(() => {
-    if (resume) setSelectedStatus(resume.status);
-  }, [resume]);
-
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!resume) return;
     if (newComment.trim()) {
-      onAddComment(resume.id, {
-        text: newComment.trim(),
-        authorId: user.id,
-        authorName: user.name,
-        resolved: false,
-      });
-      setNewComment('');
+      try {
+        await addCommentToResume(resume.id, {
+          text: newComment.trim(),
+          authorId: user.id,
+          authorName: user.name,
+          resolved: false,
+        });
+        setNewComment('');
+      } catch (e) {
+        alert('Failed to add comment');
+      }
     }
   };
 
-  const handleStatusChange = (status: Resume['status']) => {
+  const handleStatusChange = async (status: Resume['status']) => {
     if (!resume) return;
     setSelectedStatus(status);
-    onStatusUpdate(resume.id, status);
+    try {
+      await updateResumeStatus(resume.id, status);
+    } catch {
+      alert('Failed to update status');
+    }
+  };
+
+  const startEdit = (commentId: string, currentText: string) => {
+    setEditingId(commentId);
+    setEditText(currentText);
+  };
+
+  const saveEdit = async () => {
+    if (!resume || !editingId) return;
+    try {
+      await editCommentInResume(resume.id, editingId, editText.trim());
+      setEditingId(null);
+      setEditText('');
+    } catch {
+      alert('Failed to edit comment');
+    }
+  };
+
+  const removeComment = async (commentId: string) => {
+    if (!resume) return;
+    if (!confirm('Delete this comment?')) return;
+    try {
+      await deleteCommentFromResume(resume.id, commentId);
+    } catch {
+      alert('Failed to delete comment');
+    }
   };
 
   const formatDate = (dateString: string) =>
@@ -265,7 +283,7 @@ export function ReviewScreen({ user, onAddComment, onStatusUpdate }: ReviewScree
                     >
                       <div className="p-6 text-center">
                         <p className="text-sm text-gray-600 mb-4">
-                          Your browser does not support inline PDFs.{" "}
+                          Your browser does not support inline PDFs.{' '}
                           <a href={resume.downloadURL} target="_blank" rel="noreferrer" className="underline">
                             Open the resume in a new tab
                           </a>
@@ -358,14 +376,49 @@ export function ReviewScreen({ user, onAddComment, onStatusUpdate }: ReviewScree
                               {formatDate(comment.createdAt)}
                             </p>
                           </div>
-                          {comment.resolved && (
-                            <Badge variant="secondary" className="text-xs">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Resolved
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {comment.resolved && (
+                              <Badge variant="secondary" className="text-xs">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Resolved
+                              </Badge>
+                            )}
+                            {comment.authorId === user.id && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEdit(comment.id, comment.text)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeComment(comment.id)}
+                                >
+                                  Delete
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm mb-3">{comment.text}</p>
+
+                        {editingId === comment.id ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              rows={3}
+                            />
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={saveEdit}>Save</Button>
+                              <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm mb-3">{comment.text}</p>
+                        )}
 
                         {/* Replies */}
                         {comment.replies.length > 0 && (

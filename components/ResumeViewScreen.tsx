@@ -21,7 +21,8 @@ import {
 import { ImageWithFallback } from "./ImageWithFallback";
 import { User, Resume } from "../src/App";
 import app from "../src/firebaseConfig";
-import { getFirestore, doc as fsDoc, getDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc as fsDoc, deleteDoc } from "firebase/firestore";
+import { subscribeToResume, addReplyToComment, toggleCommentResolved } from "./resumeRepo";
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString("en-US", {
@@ -92,6 +93,9 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
   const [loading, setLoading] = useState<boolean>(!!id);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // per-comment reply inputs
+  const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (!id) {
       setFsResume(null);
@@ -102,37 +106,21 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
     setLoading(true);
     setLoadError(null);
 
-    const ref = fsDoc(db, "resumes", id);
-    getDoc(ref)
-      .then((snap) => {
-        if (!snap.exists()) {
-          setFsResume(null);
-        } else {
-          const data = snap.data() as any;
-          setFsResume({
-            id: data.id ?? snap.id,
-            fileName: data.fileName ?? "Untitled",
-            studentId: data.studentId ?? "",
-            studentName: data.studentName ?? "",
-            uploadDate: data.uploadDate ?? new Date().toISOString(),
-            status: data.status ?? "pending",
-            reviewerId: data.reviewerId ?? undefined,
-            reviewerName: data.reviewerName ?? undefined,
-            comments: (data.comments ?? []) as any[],
-            version: data.version ?? 1,
-            downloadURL: data.downloadURL,
-            storagePath: data.storagePath,
-            // preserve any other fields
-            ...data,
-          } as Resume);
-        }
-      })
-      .catch((err) => {
-        console.error("[ResumeViewScreen] failed to load resume", err);
-        setLoadError((err as any)?.message || "Failed to load resume");
+    const unsub = subscribeToResume(
+      id,
+      (loaded) => {
+        setFsResume(loaded);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("[ResumeViewScreen] failed to subscribe", err);
+        setLoadError(err);
         setFsResume(null);
-      })
-      .finally(() => setLoading(false));
+        setLoading(false);
+      }
+    );
+
+    return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -155,6 +143,34 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
         console.error("[ResumeViewScreen] failed to delete resume", error);
         alert("Failed to delete resume. Please try again.");
       }
+    }
+  };
+
+  const handleReplyChange = (commentId: string, text: string) => {
+    setReplyInputs((s) => ({ ...s, [commentId]: text }));
+  };
+
+  const handleReply = async (commentId: string) => {
+    const text = replyInputs[commentId]?.trim();
+    if (!resume || !text) return;
+    try {
+      await addReplyToComment(resume.id, commentId, {
+        text,
+        authorId: user.id,
+        authorName: user.name,
+      });
+      setReplyInputs((s) => ({ ...s, [commentId]: "" }));
+    } catch {
+      alert("Failed to add reply");
+    }
+  };
+
+  const markResolved = async (commentId: string) => {
+    if (!resume) return;
+    try {
+      await toggleCommentResolved(resume.id, commentId, true);
+    } catch {
+      alert("Failed to mark resolved");
     }
   };
 
@@ -387,6 +403,11 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                                 <p className="font-medium text-sm flex items-center gap-2"><UserIcon className="w-3 h-3" />{comment.authorName}</p>
                                 <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
                               </div>
+                              {user.type === "student" && (
+                                <Button variant="outline" size="sm" onClick={() => markResolved(comment.id)}>
+                                  <CheckCircle className="w-3 h-3 mr-1" /> Mark Resolved
+                                </Button>
+                              )}
                             </div>
                             <p className="text-sm mb-3 bg-red-50 p-3 rounded">{comment.text}</p>
 
@@ -400,7 +421,21 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                                   <p className="text-sm">{reply.text}</p>
                                 </div>
                               ))}
-                              <Button variant="outline" size="sm" className="text-xs"><Send className="w-3 h-3 mr-1" />Reply</Button>
+
+                              {user.type === "student" && (
+                                <div className="flex items-start gap-2">
+                                  <textarea
+                                    className="w-full border rounded p-2 text-sm"
+                                    rows={2}
+                                    placeholder="Write a reply..."
+                                    value={replyInputs[comment.id] || ""}
+                                    onChange={(e) => handleReplyChange(comment.id, e.target.value)}
+                                  />
+                                  <Button variant="outline" size="sm" onClick={() => handleReply(comment.id)}>
+                                    <Send className="w-3 h-3 mr-1" /> Reply
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
