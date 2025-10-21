@@ -218,13 +218,9 @@ function ReviewWrapper({
   const navigate = useNavigate();
   if (!currentUser) return <Navigate to="/login" replace />;
 
-  const resume = resumes.find((r) => r.id === id);
-  if (!resume) return <div className="p-8">Resume not found</div>;
-
   return (
     <ReviewScreen
       user={currentUser}
-      resume={resume}
       onAddComment={onAddComment}
       onStatusUpdate={onStatusUpdate}
     />
