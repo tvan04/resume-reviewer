@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { Alert, AlertDescription } from "./ui/alert";
-import { FileText, X, CheckCircle, AlertCircle } from "lucide-react";
+import { FileText, X, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 import { User, Resume } from "../src/App";
 import svgPaths from "../public/svg";
 import app from "../src/firebaseConfig";
@@ -238,8 +238,20 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
       <div className="px-[79px] pt-[20px] pb-16 ">
         <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
+        {/* Header */}
+        <div className="mb-8">
+          {/* Back button aligned top-left under nav */}
+          <Button
+            variant="outline"
+            onClick={() => navigate("/student")}
+            className="flex items-center gap-2 mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
+
+          {/* Centered title and subtitle */}
+          <div className="text-center">
             <h1 className="text-[64px] font-bold text-black tracking-[-1.28px] leading-normal mb-4">
               Upload Resume
             </h1>
@@ -247,6 +259,7 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
               Share your resume with career advisors for feedback
             </p>
           </div>
+        </div>
 
           {/* Upload Card */}
           <Card className="mb-8">
