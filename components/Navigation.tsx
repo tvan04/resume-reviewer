@@ -1,4 +1,8 @@
-// ...existing code...
+// Contributors:
+//  Luke Arvey - 1 Hours
+//  Ridley Wills - 2 Hours
+//  Tristan Van - 2 Hours
+
 import { Button } from './ui/button';
 import { User } from '../src/App';
 import { useNavigate } from 'react-router-dom';

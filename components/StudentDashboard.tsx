@@ -1,4 +1,8 @@
-// ...existing code...
+// Contributors:
+//  Luke Arvey - 2 Hours
+//  Ridley Wills - 4 Hours
+//  Tristan Van - 3 Hours
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavigationBar } from './Navigation';
