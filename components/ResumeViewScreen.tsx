@@ -21,7 +21,7 @@ import {
 import { ImageWithFallback } from "./ImageWithFallback";
 import { User, Resume } from "../src/App";
 import app from "../src/firebaseConfig";
-import { getFirestore, doc as fsDoc, getDoc } from "firebase/firestore";
+import { getFirestore, doc as fsDoc, getDoc, deleteDoc } from "firebase/firestore";
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString("en-US", {
@@ -143,6 +143,21 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
 
   const go = (path: string) => navigate(path);
 
+  const deleteResume = async () => {
+    if (!resume || !resume.id) return;
+
+    if (window.confirm("Are you sure you want to delete this resume? This action cannot be undone.")) {
+      try {
+        await deleteDoc(fsDoc(db, "resumes", resume.id));
+        alert("Resume deleted successfully.");
+        go("/student");
+      } catch (error) {
+        console.error("[ResumeViewScreen] failed to delete resume", error);
+        alert("Failed to delete resume. Please try again.");
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -238,16 +253,49 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                             Print
                           </Button>
                         </a>
-                        <Button variant="outline" size="sm" onClick={() => navigator.clipboard?.writeText(resume.downloadURL)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigator.clipboard?.writeText(resume.downloadURL)}
+                        >
                           <Share2 className="w-4 h-4 mr-2" />
                           Copy Link
                         </Button>
+                        {user.type === "student" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-600 hover:bg-red-50"
+                            onClick={deleteResume}
+                          >
+                            Delete Resume
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <>
-                        <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" />Download</Button>
-                        <Button variant="outline" size="sm"><Printer className="w-4 h-4 mr-2" />Print</Button>
-                        <Button variant="outline" size="sm"><Share2 className="w-4 h-4 mr-2" />Share</Button>
+                        <Button variant="outline" size="sm">
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Printer className="w-4 h-4 mr-2" />
+                          Print
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Share2 className="w-4 h-4 mr-2" />
+                          Share
+                        </Button>
+                        {user.type === "student" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-600 hover:bg-red-50"
+                            onClick={deleteResume}
+                          >
+                            Delete Resume
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>
