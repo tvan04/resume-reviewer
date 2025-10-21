@@ -1,45 +1,112 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { 
-  FileText, 
-  MessageSquare, 
-  CheckCircle, 
-  Clock, 
+import {
+  FileText,
+  MessageSquare,
+  CheckCircle,
+  Clock,
   Send,
   ArrowLeft,
   Download,
-  Printer
+  Printer,
 } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 import { User, Resume, Comment } from '../src/App';
+import app from '../src/firebaseConfig';
+import { getFirestore, doc as fsDoc, getDoc } from 'firebase/firestore';
 
 interface ReviewScreenProps {
   user: User;
-  resume: Resume;
   onAddComment: (resumeId: string, comment: Omit<Comment, 'id' | 'createdAt' | 'replies'>) => void;
   onStatusUpdate: (resumeId: string, status: Resume['status']) => void;
 }
 
-export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: ReviewScreenProps) {
+export function ReviewScreen({ user, onAddComment, onStatusUpdate }: ReviewScreenProps) {
   const [newComment, setNewComment] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<Resume['status']>(resume.status);
-
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const db = getFirestore(app);
+
+  const [fsResume, setFsResume] = useState<Resume | null>(null);
+  const [loading, setLoading] = useState<boolean>(!!id);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<Resume['status']>('pending');
+
+  useEffect(() => {
+    let mounted = true;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError(null);
+
+    const ref = fsDoc(db, 'resumes', id);
+    getDoc(ref)
+      .then((snap) => {
+        if (!mounted) return;
+        if (!snap.exists()) {
+          setFsResume(null);
+          setLoadError('Resume not found');
+        } else {
+          const data = snap.data() as any;
+          const loaded: Resume = {
+            id: data.id ?? snap.id,
+            fileName: data.fileName ?? 'Untitled',
+            studentId: data.studentId ?? '',
+            studentName: data.studentName ?? '',
+            uploadDate: data.uploadDate ?? new Date().toISOString(),
+            status: data.status ?? 'pending',
+            reviewerId: data.reviewerId ?? undefined,
+            reviewerName: data.reviewerName ?? undefined,
+            comments: (data.comments ?? []) as any[],
+            version: data.version ?? 1,
+            downloadURL: data.downloadURL,
+            storagePath: data.storagePath,
+            ...data,
+          };
+          setFsResume(loaded);
+          setSelectedStatus(loaded.status);
+        }
+      })
+      .catch((err) => {
+        console.error('[ReviewScreen] failed to load resume', err);
+        if (!mounted) return;
+        setLoadError((err as any)?.message || 'Failed to load resume');
+        setFsResume(null);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, db]);
+
+  const resume = fsResume;
+
+  useEffect(() => {
+    if (resume) setSelectedStatus(resume.status);
+  }, [resume]);
 
   const handleAddComment = () => {
+    if (!resume) return;
     if (newComment.trim()) {
       onAddComment(resume.id, {
         text: newComment.trim(),
@@ -52,6 +119,7 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: Rev
   };
 
   const handleStatusChange = (status: Resume['status']) => {
+    if (!resume) return;
     setSelectedStatus(status);
     onStatusUpdate(resume.id, status);
   };
@@ -80,6 +148,24 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: Rev
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-600">Loading resume…</p>
+      </div>
+    );
+  }
+
+  if (!resume) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <p className="text-lg text-gray-600">Resume not found.</p>
+        {loadError && <p className="text-sm text-red-600 mt-2">{loadError}</p>}
+        <Button onClick={() => navigate('/reviewer')} className="mt-4">Back to Dashboard</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -137,20 +223,39 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: Rev
                     Resume Preview
                   </CardTitle>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Printer className="w-4 h-4 mr-2" />
-                      Print
-                    </Button>
+                    {resume.downloadURL ? (
+                      <>
+                        <a href={resume.downloadURL} target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm">
+                            <Download className="w-4 h-4 mr-2" />
+                            Download
+                          </Button>
+                        </a>
+                        <a href={resume.downloadURL} target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm">
+                            <Printer className="w-4 h-4 mr-2" />
+                            Print
+                          </Button>
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="outline" size="sm">
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Printer className="w-4 h-4 mr-2" />
+                          Print
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {resume.downloadURL ? (
-                  <div className="bg-gray-100 min-h-[800px] rounded-lg overflow-hidden">
+                <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
+                  {resume.downloadURL ? (
                     <object
                       data={resume.downloadURL}
                       type="application/pdf"
@@ -168,16 +273,14 @@ export function ReviewScreen({ user, resume, onAddComment, onStatusUpdate }: Rev
                         </p>
                       </div>
                     </object>
-                  </div>
-                ) : (
-                  <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
+                  ) : (
                     <ImageWithFallback
                       src="/placeholder-resume-full.png"
                       alt={resume.fileName}
                       className="max-w-full max-h-full object-contain"
                     />
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
