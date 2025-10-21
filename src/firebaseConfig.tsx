@@ -1,4 +1,8 @@
-// Import the functions you need from the SDKs you need
+// Contributors:
+//  Luke Arvey - 1 Hour
+//  Ridley Wills - 1 Hour
+//  Tristan Van - 3 Hours
+
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 // TODO: Add SDKs for Firebase products that you want to use

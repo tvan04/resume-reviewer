@@ -1,3 +1,8 @@
+// Contributors:
+//  Luke Arvey - 2 Hours
+//  Ridley Wills - 3 Hours
+//  Tristan Van - 5 Hours
+
 import React, { useState } from "react";
 import {
   Routes,

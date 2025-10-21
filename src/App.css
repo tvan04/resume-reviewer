@@ -1,3 +1,9 @@
+/*  
+  Contributors:
+  Luke Arvey - 2 Hours
+  Ridley Wills - 4 Hours
+  Tristan Van - 1 Hour */
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
