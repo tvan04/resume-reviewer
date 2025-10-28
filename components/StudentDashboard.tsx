@@ -183,11 +183,26 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
               >
                 <CardContent className="p-0">
                   <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                    <ImageWithFallback
-                      src="/placeholder-resume.png"
-                      alt={resume.fileName}
-                      className="w-full h-full object-cover"
-                    />
+                    {resume.downloadURL ? (
+                      <object
+                        data={resume.downloadURL}
+                        type="application/pdf"
+                        width="100%"
+                        height="100%"
+                      >
+                        <ImageWithFallback
+                          src="/placeholder-resume.png"
+                          alt={resume.fileName}
+                          className="w-full h-full object-cover"
+                        />
+                      </object>
+                    ) : (
+                      <ImageWithFallback
+                        src="/placeholder-resume.png"
+                        alt={resume.fileName}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
                   </div>
                   <div className="p-4">
                     <p className="font-medium text-sm truncate">{resume.fileName}</p>
@@ -241,11 +256,26 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
                 >
                   <CardContent className="p-0">
                     <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                      <ImageWithFallback
-                        src="/placeholder-resume.png"
-                        alt={resume.fileName}
-                        className="w-full h-full object-cover"
-                      />
+                      {resume.downloadURL ? (
+                        <object
+                          data={resume.downloadURL}
+                          type="application/pdf"
+                          width="100%"
+                          height="100%"
+                        >
+                          <ImageWithFallback
+                            src="/placeholder-resume.png"
+                            alt={resume.fileName}
+                            className="w-full h-full object-cover"
+                          />
+                        </object>
+                      ) : (
+                        <ImageWithFallback
+                          src="/placeholder-resume.png"
+                          alt={resume.fileName}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
                     <div className="p-4">
                       <p className="font-medium text-sm truncate">{resume.fileName}</p>
@@ -285,11 +315,26 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
                 >
                   <CardContent className="p-0">
                     <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                      <ImageWithFallback
-                        src="/placeholder-resume.png"
-                        alt={resume.fileName}
-                        className="w-full h-full object-cover"
-                      />
+                      {resume.downloadURL ? (
+                        <object
+                          data={resume.downloadURL}
+                          type="application/pdf"
+                          width="100%"
+                          height="100%"
+                        >
+                          <ImageWithFallback
+                            src="/placeholder-resume.png"
+                            alt={resume.fileName}
+                            className="w-full h-full object-cover"
+                          />
+                        </object>
+                      ) : (
+                        <ImageWithFallback
+                          src="/placeholder-resume.png"
+                          alt={resume.fileName}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
                     <div className="p-4">
                       <p className="font-medium text-sm truncate">{resume.fileName}</p>
