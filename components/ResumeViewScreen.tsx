@@ -28,6 +28,10 @@ import { User, Resume } from "../src/App";
 import app from "../src/firebaseConfig";
 import { getFirestore, doc as fsDoc, deleteDoc } from "firebase/firestore";
 import { subscribeToResume, addReplyToComment, toggleCommentResolved } from "./resumeRepo";
+import { collection, getDocs, query, where, updateDoc, onSnapshot } from "firebase/firestore";
+import { arrayUnion, arrayRemove } from 'firebase/firestore';
+
+
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString("en-US", {
@@ -100,7 +104,36 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
 
   // per-comment reply inputs
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
+  const [reviewers, setReviewers] = useState<{ id: string; name: string }[]>([]);
+  const [selectedReviewer, setSelectedReviewer] = useState("");
 
+
+  // Fetch reviewers from Firestore
+  useEffect(() => {
+    const fetchReviewers = async () => {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "reviewer"));
+        const querySnapshot = await getDocs(q);
+        const reviewerList = querySnapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            name: data.name || "Unnamed Reviewer",
+            email: data.email || "",
+          };
+        });
+        setReviewers(reviewerList);
+      } catch (error) {
+        console.error("Error fetching reviewers:", error);
+      }
+    };
+
+    fetchReviewers();
+  }, [db]);
+
+
+
+  // Existing resume subscription 
   useEffect(() => {
     if (!id) {
       setFsResume(null);
@@ -129,10 +162,22 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+
   // fallback: find resume from passed props if Firestore result missing
   const resumeFromProps = useMemo(() => resumes.find((r) => r.id === id), [id, resumes]);
 
   const resume: Resume | null = fsResume ?? resumeFromProps ?? null;
+
+  // Get names of reviewers who have access
+  const sharedReviewerNames = useMemo(() => {
+    const sharedIds = resume?.sharedWithIds ?? [];
+    if (sharedIds.length === 0 || reviewers.length === 0) return [];
+    return reviewers
+      .filter((r) => sharedIds.includes(r.id))
+      .map((r) => r.name);
+  }, [resume?.sharedWithIds, reviewers]);
+
+
 
   const go = (path: string) => navigate(path);
 
@@ -150,6 +195,40 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
       }
     }
   };
+
+const assignReviewer = async () => {
+  if (!resume || !selectedReviewer) return;
+
+  try {
+    const chosenReviewer = reviewers.find((r) => r.id === selectedReviewer);
+    if (!chosenReviewer) return;
+
+    const resumeRef = fsDoc(db, "resumes", resume.id);
+
+    // 🔹 Add this reviewer to sharedWithIds (if not already there)
+    await updateDoc(resumeRef, {
+      sharedWithIds: arrayUnion(chosenReviewer.id),
+    });
+
+    // 🔹 Optionally update reviewer display name for UI purposes
+    await updateDoc(resumeRef, {
+      reviewerName: chosenReviewer.name,
+    });
+
+    alert(`Added ${chosenReviewer.name} as a reviewer.`);
+
+    // Update local UI instantly
+    setFsResume({
+      ...resume,
+      reviewerName: chosenReviewer.name,
+      sharedWithIds: [...(resume.sharedWithIds || []), chosenReviewer.id],
+    });
+  } catch (error) {
+    console.error("Error assigning reviewer:", error);
+    alert("Failed to assign reviewer. Please try again.");
+  }
+};
+
 
   const handleReplyChange = (commentId: string, text: string) => {
     setReplyInputs((s) => ({ ...s, [commentId]: text }));
@@ -240,17 +319,18 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             {getStatusMessage(resume.status)}
-            {resume.reviewerName && (
-              <span>
-                {" "}
-                Assigned reviewer: <strong>{resume.reviewerName}</strong>
-              </span>
-            )}
+              {sharedReviewerNames.length > 0 && (
+                <span>
+                  {" "}
+                  Shared with:{" "}
+                  <strong>{sharedReviewerNames.join(", ")}</strong>
+                </span>
+              )}
           </AlertDescription>
         </Alert>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Resume Preview: embed actual PDF when available */}
+          {/* Resume Preview */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
@@ -345,7 +425,11 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                   </div>
                 ) : (
                   <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
-                    <ImageWithFallback src="/placeholder-resume-full.png" alt={resume.fileName} className="max-w-full max-h-full object-contain" />
+                    <ImageWithFallback
+                      src="/placeholder-resume-full.png"
+                      alt={resume.fileName}
+                      className="max-w-full max-h-full object-contain"
+                    />
                   </div>
                 )}
               </CardContent>
@@ -378,14 +462,49 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                   <p className="text-sm font-medium text-gray-600">Version</p>
                   <p className="text-sm">v{resume.version}</p>
                 </div>
-                {resume.reviewerName && (
+                {sharedReviewerNames.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Reviewer</p>
-                    <p className="text-sm">{resume.reviewerName}</p>
+                    <p className="text-sm font-medium text-gray-600">Shared With</p>
+                    <p className="text-sm">{sharedReviewerNames.join(", ")}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* ✅ Select Reviewer Section */}
+            {user.type === "student" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select Reviewer</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {reviewers.length > 0 ? (
+                    <select
+                      className="w-full border rounded p-2 text-sm"
+                      value={selectedReviewer}
+                      onChange={(e) => setSelectedReviewer(e.target.value)}
+                    >
+                      <option value="">-- Choose a Reviewer --</option>
+                      {reviewers.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm text-gray-500">No reviewers available.</p>
+                  )}
+
+                  <Button
+                    className="mt-3 w-full"
+                    onClick={assignReviewer}
+                    disabled={!selectedReviewer}
+                  >
+                    Assign Reviewer
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Comments Section */}
             <Card>

@@ -3,7 +3,7 @@
 //  Ridley Wills - 1 Hours
 //  Tristan Van - 4 Hours
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { NavigationBar } from "./Navigation";
 import { Button } from "./ui/button";
@@ -14,7 +14,15 @@ import { FileText, X, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 import { User, Resume } from "../src/App";
 import svgPaths from "../public/svg";
 import app from "../src/firebaseConfig";
-import { getFirestore, collection, doc, setDoc } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import {
   getStorage,
   ref as storageRef,
@@ -34,6 +42,12 @@ interface UploadFile {
   error?: string;
 }
 
+interface Reviewer {
+  id: string;
+  name: string;
+  email?: string;
+}
+
 export function UploadScreen({ user, onUpload }: UploadScreenProps) {
   const navigate = useNavigate();
   const db = getFirestore(app);
@@ -42,6 +56,37 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // --- new states ---
+  const [reviewers, setReviewers] = useState<Reviewer[]>([]);
+  const [selectedReviewers, setSelectedReviewers] = useState<Reviewer[]>([]);
+  const [loadingReviewers, setLoadingReviewers] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // --- fetch reviewers from Firestore ---
+  useEffect(() => {
+    const fetchReviewers = async () => {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "reviewer"));
+        const querySnapshot = await getDocs(q);
+        const reviewerList = querySnapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            name: data.name || "Unnamed Reviewer",
+            email: data.email || "",
+          };
+        });
+        setReviewers(reviewerList);
+      } catch (error) {
+        console.error("Error fetching reviewers:", error);
+      } finally {
+        setLoadingReviewers(false);
+      }
+    };
+
+    fetchReviewers();
+  }, [db]);
 
   // ---------------- Validation ----------------
   const validateFile = (file: File): string | undefined => {
@@ -57,7 +102,6 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
   // ---------------- File Handling (with Firebase) ----------------
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
-    console.debug("[UploadScreen] selected files:", files.length);
     const newFiles: UploadFile[] = [];
 
     for (let i = 0; i < files.length; i++) {
@@ -88,7 +132,11 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
             : f
         )
       );
-      console.warn("[UploadScreen] upload blocked: no user signed in");
+      return;
+    }
+
+    if (selectedReviewers.length === 0) {
+      alert("Please select at least one reviewer before uploading.");
       return;
     }
 
@@ -98,16 +146,12 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
       const file = uploadFile.file;
 
       try {
-        // create a new document ref with an auto id
         const docRef = doc(collection(db, "resumes"));
         const resumeId = docRef.id;
-        console.debug("[UploadScreen] creating resume doc", { resumeId, fileName: file.name, userId: user.id });
-
         const path = `resumes/${resumeId}/${file.name}`;
         const sRef = storageRef(storage, path);
         const task = uploadBytesResumable(sRef, file);
 
-        // listen for progress
         task.on(
           "state_changed",
           (snapshot) => {
@@ -117,21 +161,17 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
             );
           },
           (error) => {
-            // upload error
-            console.error("[UploadScreen] storage upload error", { file: file.name, error });
             setUploadFiles((prev) =>
               prev.map((f) =>
-                f.file === file ? { ...f, status: "error", error: (error as any)?.message || String(error) } : f
+                f.file === file
+                  ? { ...f, status: "error", error: (error as any)?.message || String(error) }
+                  : f
               )
             );
           },
           async () => {
-            // upload complete
             try {
               const downloadURL = await getDownloadURL(sRef);
-              console.debug("[UploadScreen] file uploaded, downloadURL obtained", { file: file.name, downloadURL });
-
-              // build firestore document
               const resumeDoc = {
                 id: resumeId,
                 fileName: file.name,
@@ -139,36 +179,24 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
                 studentName: user.name,
                 uploadDate: new Date().toISOString(),
                 status: "pending",
-                reviewerId: null,
-                reviewerName: null,
+                sharedWith: selectedReviewers.map((r) => ({
+                  id: r.id,
+                  name: r.name,
+                  email: r.email || null,
+                })),
+                sharedWithIds: selectedReviewers.map((r) => r.id), // 👈 ADD THIS LINE
                 comments: [] as any[],
                 version: 1,
                 storagePath: path,
                 downloadURL,
               };
-
-              // write to Firestore
-              try {
-                await setDoc(docRef, resumeDoc as any);
-                console.debug("[UploadScreen] resume doc written", { resumeId });
-              } catch (writeErr) {
-                console.error("[UploadScreen] failed to write resume doc to Firestore", { resumeId, file: file.name, writeErr });
-                setUploadFiles((prev) =>
-                  prev.map((f) =>
-                    f.file === file ? { ...f, status: "error", error: (writeErr as any)?.message || "Failed to write resume metadata" } : f
-                  )
-                );
-                return;
-              }
-
-              // update UI state for this file
+              await setDoc(docRef, resumeDoc);
               setUploadFiles((prev) =>
                 prev.map((f) =>
                   f.file === file ? { ...f, status: "success", progress: 100 } : f
                 )
               );
 
-              // notify parent (keeps backward compatibility)
               const payload: Omit<Resume, "id" | "uploadDate" | "version"> = {
                 fileName: file.name,
                 studentId: user.id,
@@ -178,37 +206,25 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
                 downloadURL,
                 storagePath: path,
               };
-              try {
-                onUpload(payload);
-              } catch (callbackErr) {
-                console.error("[UploadScreen] onUpload callback threw", { callbackErr });
-              }
+              onUpload(payload);
             } catch (err) {
-              console.error("[UploadScreen] error obtaining download URL or processing upload completion", { file: file.name, err });
               setUploadFiles((prev) =>
                 prev.map((f) =>
-                  f.file === file ? { ...f, status: "error", error: (err as any)?.message || "Upload completion failed" } : f
+                  f.file === file
+                    ? { ...f, status: "error", error: (err as any)?.message || "Upload failed" }
+                    : f
                 )
               );
             }
           }
         );
-      } catch (outerErr) {
-        console.error("[UploadScreen] unexpected error during upload setup", { file: file.name, outerErr });
-        setUploadFiles((prev) =>
-          prev.map((f) =>
-            f.file === file ? { ...f, status: "error", error: (outerErr as any)?.message || "Upload failed" } : f
-          )
-        );
+      } catch (err) {
+        console.error("[UploadScreen] unexpected upload setup error", err);
       }
     }
 
     setIsUploading(false);
-
-    // Navigate to dashboard after a short delay so user can see result
-    setTimeout(() => {
-      navigate("/student");
-    }, 1500);
+    setTimeout(() => navigate("/student"), 1500);
   };
 
   // ---------------- Drag & Drop ----------------
@@ -225,16 +241,25 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    try {
-      handleFileSelect(e.dataTransfer.files);
-    } catch (err) {
-      console.error("[UploadScreen] error handling drop event", err);
-    }
+    handleFileSelect(e.dataTransfer.files);
   }, []);
 
   const removeFile = (fileToRemove: File) => {
     setUploadFiles((prev) => prev.filter((f) => f.file !== fileToRemove));
   };
+
+  const toggleReviewer = (reviewer: Reviewer) => {
+    setSelectedReviewers((prev) =>
+      prev.some((r) => r.id === reviewer.id)
+        ? prev.filter((r) => r.id !== reviewer.id)
+        : [...prev, reviewer]
+    );
+  };
+
+  // Filter reviewers based on search
+  const filteredReviewers = reviewers.filter((r) =>
+    r.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // ---------------- Render ----------------
   return (
@@ -243,28 +268,80 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
       <div className="px-[79px] pt-[20px] pb-16 ">
         <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          {/* Back button aligned top-left under nav */}
-          <Button
-            variant="outline"
-            onClick={() => navigate("/student")}
-            className="flex items-center gap-2 mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Button>
+          {/* Header */}
+          <div className="mb-8">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/student")}
+              className="flex items-center gap-2 mb-6"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </Button>
 
-          {/* Centered title and subtitle */}
-          <div className="text-center">
-            <h1 className="text-[64px] font-bold text-black tracking-[-1.28px] leading-normal mb-4">
-              Upload Resume
-            </h1>
-            <p className="text-xl text-gray-600">
-              Share your resume with career advisors for feedback
-            </p>
+            <div className="text-center">
+              <h1 className="text-[64px] font-bold text-black tracking-[-1.28px] leading-normal mb-4">
+                Upload Resume
+              </h1>
+              <p className="text-xl text-gray-600">
+                Share your resume with career advisors for feedback
+              </p>
+            </div>
           </div>
-        </div>
+
+          {/* Reviewer Selection Card */}
+          <Card className="mb-8">
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold mb-4">Select Reviewers</h2>
+
+              {loadingReviewers ? (
+                <p>Loading reviewers...</p>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Search reviewers..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full border rounded px-3 py-2 mb-4 text-sm"
+                  />
+
+                  {filteredReviewers.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No reviewers found.</p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto space-y-2 border rounded p-2">
+                      {filteredReviewers.map((r) => (
+                        <label key={r.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedReviewers.some((sel) => sel.id === r.id)}
+                            onChange={() => toggleReviewer(r)}
+                          />
+                          <span>{r.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {selectedReviewers.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-1">Selected:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedReviewers.map((r) => (
+                      <span
+                        key={r.id}
+                        className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded"
+                      >
+                        {r.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Upload Card */}
           <Card className="mb-8">
@@ -392,7 +469,10 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
                       )}
 
                       {uploadFile.status === "uploading" && (
-                        <Progress value={uploadFile.progress} className="mt-2" />
+                        <Progress
+                          value={uploadFile.progress}
+                          className="mt-2"
+                        />
                       )}
                     </div>
                   ))}

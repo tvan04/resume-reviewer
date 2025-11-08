@@ -10,11 +10,14 @@ import {
   getDoc,
   onSnapshot,
   updateDoc,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { Resume, Comment, Reply } from '../src/App';
 
 const db = getFirestore(app);
 
+//   SUBSCRIBE TO RESUME
 export function subscribeToResume(
   resumeId: string,
   onData: (resume: Resume | null) => void,
@@ -42,6 +45,7 @@ export function subscribeToResume(
         version: data.version ?? 1,
         downloadURL: data.downloadURL,
         storagePath: data.storagePath,
+        sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [], // ✅ add this line
         ...data,
       };
       onData(resume);
@@ -53,6 +57,7 @@ export function subscribeToResume(
   );
 }
 
+//   COMMENT HELPERS
 async function getResumeComments(resumeId: string) {
   const ref = fsDoc(db, 'resumes', resumeId);
   const snap = await getDoc(ref);
@@ -123,4 +128,33 @@ export async function addReplyToComment(
 export async function updateResumeStatus(resumeId: string, status: Resume['status']) {
   const ref = fsDoc(db, 'resumes', resumeId);
   await updateDoc(ref, { status });
+}
+
+//   SHARING HELPERS
+export async function updateResumeSharing(
+  resumeId: string,
+  sharedWith: { id: string; name: string }[]
+) {
+  const ref = fsDoc(db, 'resumes', resumeId);
+  await updateDoc(ref, { sharedWith });
+}
+
+export async function addReviewerToResume(
+  resumeId: string,
+  reviewer: { id: string; name: string }
+) {
+  const ref = fsDoc(db, 'resumes', resumeId);
+  await updateDoc(ref, {
+    sharedWith: arrayUnion(reviewer),
+  });
+}
+
+export async function removeReviewerFromResume(
+  resumeId: string,
+  reviewer: { id: string; name: string }
+) {
+  const ref = fsDoc(db, 'resumes', resumeId);
+  await updateDoc(ref, {
+    sharedWith: arrayRemove(reviewer),
+  });
 }

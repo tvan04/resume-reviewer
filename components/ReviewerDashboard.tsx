@@ -20,6 +20,7 @@ import {
   onSnapshot,
   QuerySnapshot,
   DocumentData,
+  where,
 } from "firebase/firestore";
 
 interface ReviewerDashboardProps {
@@ -41,7 +42,7 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
     setFetchError(null);
 
     try {
-      const q = query(collection(db, "resumes"), orderBy("uploadDate", "desc"));
+      const q = query(collection(db, "resumes"), where("sharedWithIds", "array-contains", user.id), orderBy("uploadDate", "desc"));
       const unsub = onSnapshot(
         q,
         (snapshot: QuerySnapshot<DocumentData>) => {
@@ -84,9 +85,24 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
 
   const allResumes = fsResumes ?? propResumes ?? [];
 
-  const resumesInProgress = allResumes.filter((r) => r.status === "in-review" && r.reviewerId === user.id);
-  const newSubmissions = allResumes.filter((r) => r.status === "pending");
-  const approvedResumes = allResumes.filter((r) => r.status === "approved");
+  //const newSubmissions = allResumes.filter((r) => r.status === "pending");
+  //const approvedResumes = allResumes.filter((r) => r.status === "approved");
+  const newSubmissions = allResumes.filter(
+    (r) => r.status === "pending" && r.sharedWithIds?.includes(user.id)
+  );
+
+  const approvedResumes = allResumes.filter(
+    (r) => r.status === "approved" && r.sharedWithIds?.includes(user.id)
+  ); 
+
+  const resumesInProgress = allResumes.filter(
+    (r) => r.status === "in-review" && r.sharedWithIds?.includes(user.id)
+  );
+
+  const reviewedResumes = allResumes.filter(
+    (r) => r.status === "reviewed" && r.sharedWithIds?.includes(user.id)
+  );
+
 
   const getStatusIcon = (status: Resume["status"]) => {
     switch (status) {
@@ -225,6 +241,50 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
             </div>
           )}
         </section>
+
+`        {/* Reviewed Resumes */}
+        ``{reviewedResumes.length > 0 && (
+          <section className="mb-16">
+            <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">Reviewed Resumes</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {reviewedResumes.map((resume) => (
+                <Card
+                  key={resume.id}
+                  className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
+                  onClick={() => navigate(`/review/${resume.id}`)}
+                >
+                  <CardContent className="p-0">
+                    <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
+                      {resume.downloadURL ? (
+                        <object data={resume.downloadURL} type="application/pdf" width="100%" height="100%">
+                          <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
+                        </object>
+                      ) : (
+                        <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <p className="font-medium text-sm truncate">{resume.fileName}</p>
+                      <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
+                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(resume.uploadDate)}</p>
+                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
+                        <span className="flex items-center gap-1">
+                          {getStatusIcon(resume.status)}
+                          Reviewed
+                        </span>
+                      </Badge>
+                      {resume.comments.length > 0 && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          {resume.comments.length} comment{resume.comments.length !== 1 ? "s" : ""} added
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Approved Resumes */}
         <section>
