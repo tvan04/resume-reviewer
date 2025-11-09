@@ -39,11 +39,18 @@ export interface Resume {
   status: "pending" | "in-review" | "reviewed" | "approved";
   reviewerId?: string;
   reviewerName?: string;
+  sharedWithIds?: string[];
   comments: Comment[];
   version: number;
   downloadURL: string;
   storagePath: string;
+
+  sharedWith?: {
+    id: string;
+    name: string;
+  }[];
 }
+
 
 export interface Comment {
   id: string;
