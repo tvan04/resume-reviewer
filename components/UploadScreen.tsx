@@ -101,27 +101,22 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
   // ---------------- File Handling (with Firebase) ----------------
   const handleFileSelect = (files: FileList | null) => {
-    if (!files) return;
-    const newFiles: UploadFile[] = [];
+  if (!files) return;
+  const newFiles: UploadFile[] = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const error = validateFile(file);
-      newFiles.push({
-        file,
-        progress: 0,
-        status: error ? "error" : "uploading",
-        error,
-      });
-    }
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const error = validateFile(file);
+    newFiles.push({
+      file,
+      progress: 0,
+      status: error ? "error" : "success", // mark as "success" pre-upload-ready
+      error,
+    });
+  }
 
-    setUploadFiles(newFiles);
-
-    const valid = newFiles.filter((f) => f.status === "uploading");
-    if (valid.length > 0) {
-      startUpload(valid);
-    }
-  };
+  setUploadFiles(newFiles);
+};
 
   const startUpload = async (validFiles: UploadFile[]) => {
     if (!user) {
@@ -482,11 +477,22 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
               {/* Upload Button */}
               <div className="mt-8 text-center">
                 <Button
-                  className="bg-neutral-700 text-white px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md"
-                  disabled={isUploading || uploadFiles.length === 0}
-                  onClick={() => document.getElementById("file-input")?.click()}
+                  className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${
+                    uploadFiles.length > 0 && !isUploading
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "bg-neutral-700 text-white"
+                  }`}
+                  disabled={isUploading}
+                  onClick={() => {
+                    if (uploadFiles.length === 0) {
+                      document.getElementById("file-input")?.click(); // acts as "Browse"
+                    } else {
+                      const valid = uploadFiles.filter((f) => !f.error);
+                      startUpload(valid); // 👈 manually trigger upload now
+                    }
+                  }}
                 >
-                  Upload Files
+                  {uploadFiles.length === 0 ? "Select File(s)" : "Upload Files"}
                 </Button>
               </div>
             </CardContent>
