@@ -19,6 +19,7 @@ import { ReviewScreen } from "../components/ReviewScreen";
 import { ResumeViewScreen } from "../components/ResumeViewScreen";
 import { AccountScreen } from "../components/AccountScreen";
 import { RegisterScreen } from "../components/RegisterScreen";
+import { Timestamp } from "firebase/firestore";
 import "./App.css";
 
 export type UserType = "student" | "reviewer" | null;
@@ -35,7 +36,7 @@ export interface Resume {
   fileName: string;
   studentId: string;
   studentName: string;
-  uploadDate: string;
+  uploadDate: string | Timestamp;
   status: "pending" | "in-review" | "reviewed" | "approved";
   reviewerId?: string;
   reviewerName?: string;

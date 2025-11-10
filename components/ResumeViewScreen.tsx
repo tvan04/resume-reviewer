@@ -25,16 +25,26 @@ import {
 } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { User, Resume } from "../src/App";
-import app from "../src/firebaseConfig";
+import app, { storage } from "../src/firebaseConfig";
 import { getFirestore, doc as fsDoc, deleteDoc } from "firebase/firestore";
 import { subscribeToResume, addReplyToComment, toggleCommentResolved } from "./resumeRepo";
-import { collection, getDocs, query, where, updateDoc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, query, where, updateDoc, onSnapshot, doc, Timestamp } from "firebase/firestore";
 import { arrayUnion, arrayRemove } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString("en-US", {
+const formatDate = (dateValue: any) => {
+  if (!dateValue) return "Unknown date";
+
+  const date =
+    typeof dateValue === "string"
+      ? new Date(dateValue)
+      : dateValue.toDate
+      ? dateValue.toDate()
+      : new Date(dateValue);
+
+  return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -106,6 +116,11 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
   const [reviewers, setReviewers] = useState<{ id: string; name: string }[]>([]);
   const [selectedReviewer, setSelectedReviewer] = useState("");
+
+  // Replace Resume states
+const [newFile, setNewFile] = useState<File | null>(null);
+const [uploading, setUploading] = useState(false);
+const [uploadProgress, setUploadProgress] = useState(0);
 
 
   // Fetch reviewers from Firestore
@@ -195,6 +210,58 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
       }
     }
   };
+
+const handleReplaceResume = async () => {
+  if (!newFile) return;
+  if (!resume) return;
+
+  if (newFile.type !== "application/pdf") {
+    alert("Please upload a PDF file.");
+    return;
+  }
+  if (newFile.size > 5 * 1024 * 1024) {
+    alert("File must be less than 5 MB.");
+    return;
+  }
+
+  try {
+    setUploading(true);
+    setUploadProgress(0);
+
+    const storageRef = ref(storage, `resumes/${resume.id}/${newFile.name}`);
+    const uploadTask = await uploadBytes(storageRef, newFile);
+    const newURL = await getDownloadURL(uploadTask.ref);
+
+    const resumeRef = fsDoc(db, "resumes", resume.id);
+    const newUploadDate = Timestamp.now();
+
+    await updateDoc(resumeRef, {
+      fileName: newFile.name,
+      downloadURL: newURL,
+      uploadDate: newUploadDate,
+      version: (resume.version || 1) + 1,
+    });
+
+    // Update local state instead of reloading
+    setFsResume({
+      ...resume,
+      fileName: newFile.name,
+      downloadURL: newURL,
+      uploadDate: newUploadDate,
+      version: (resume.version || 1) + 1,
+    });
+
+    setNewFile(null);
+    alert("Resume replaced successfully!");
+  } catch (error) {
+    console.error("Error replacing resume:", error);
+    alert("There was an error replacing the resume. Please try again.");
+  } finally {
+    setUploading(false);
+  }
+};
+
+
 
 const assignReviewer = async () => {
   if (!resume || !selectedReviewer) return;
@@ -430,6 +497,40 @@ const assignReviewer = async () => {
                       alt={resume.fileName}
                       className="max-w-full max-h-full object-contain"
                     />
+                  </div>
+                )}
+                {/* Replace Resume Section (visible to student only) */}
+                {user.type === "student" && (
+                  <div className="mt-6 border-t pt-4">
+                    <h3 className="text-lg font-semibold mb-2">Replace Resume</h3>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          type="button"
+                          onClick={() => document.getElementById("replaceFileInput")?.click()}
+                        >
+                          Browse for File
+                        </Button>
+                        {newFile && <span className="text-sm text-gray-700 truncate">{newFile.name}</span>}
+                      </div>
+
+                      <input
+                        id="replaceFileInput"
+                        type="file"
+                        accept="application/pdf"
+                        onChange={(e) => setNewFile(e.target.files?.[0] ?? null)}
+                        className="hidden"
+                      />
+                      <Button
+                        disabled={!newFile || uploading}
+                        onClick={handleReplaceResume}
+                        className="bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+                      >
+                        {uploading ? `Uploading... ${uploadProgress}%` : "Replace Resume"}
+                      </Button>
+                    </div>
+
                   </div>
                 )}
               </CardContent>
