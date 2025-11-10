@@ -207,7 +207,12 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
                   <div className="p-4">
                     <p className="font-medium text-sm truncate">{resume.fileName}</p>
                     <p className="text-xs text-gray-600 mt-1">
-                      {formatDate(resume.uploadDate)}
+                      {formatDate(
+                        typeof resume.uploadDate === 'string'
+                          ? resume.uploadDate
+                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                      )
+                      }
                     </p>
                     <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                       <span className="flex items-center gap-1">
@@ -283,7 +288,12 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
                         Reviewer: {resume.reviewerName}
                       </p>
                       <p className="text-xs text-gray-600">
-                        {formatDate(resume.uploadDate)}
+                        {formatDate(
+                          typeof resume.uploadDate === 'string'
+                            ? resume.uploadDate
+                            : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                        )
+                        }
                       </p>
                       <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                         <span className="flex items-center gap-1">
@@ -342,7 +352,12 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
                         Reviewed by: {resume.reviewerName}
                       </p>
                       <p className="text-xs text-gray-600">
-                        {formatDate(resume.uploadDate)}
+                        {formatDate(
+                          typeof resume.uploadDate === 'string'
+                            ? resume.uploadDate
+                            : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                        )
+                        }
                       </p>
                       <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                         <span className="flex items-center gap-1">

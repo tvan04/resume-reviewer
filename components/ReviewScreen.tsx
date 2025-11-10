@@ -326,7 +326,12 @@ export function ReviewScreen({
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Uploaded</p>
-                  <p className="text-sm">{formatDate(resume.uploadDate)}</p>
+                  <p className="text-sm">{formatDate(
+                    typeof resume.uploadDate === 'string'
+                      ? resume.uploadDate
+                      : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                  )
+                  }</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Version</p>
@@ -378,7 +383,11 @@ export function ReviewScreen({
                           <div>
                             <p className="font-medium text-sm">{comment.authorName}</p>
                             <p className="text-xs text-gray-500">
-                              {formatDate(comment.createdAt)}
+                              {formatDate(
+                                typeof resume.uploadDate === 'string'
+                                  ? resume.uploadDate
+                                  : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                              )}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -433,7 +442,11 @@ export function ReviewScreen({
                                 <div className="flex items-center gap-2 mb-1">
                                   <p className="font-medium text-xs">{reply.authorName}</p>
                                   <p className="text-xs text-gray-500">
-                                    {formatDate(reply.createdAt)}
+                                    {formatDate(
+                                        typeof resume.uploadDate === 'string'
+                                          ? resume.uploadDate
+                                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                                      )}
                                   </p>
                                 </div>
                                 <p className="text-sm">{reply.text}</p>

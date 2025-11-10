@@ -185,7 +185,12 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
                     <div className="p-4">
                       <p className="font-medium text-sm truncate">{resume.fileName}</p>
                       <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(resume.uploadDate)}</p>
+                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(
+                                                                        typeof resume.uploadDate === 'string'
+                                                                          ? resume.uploadDate
+                                                                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                                                                      )
+                                                                      }</p>
                       <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                         <span className="flex items-center gap-1">
                           {getStatusIcon(resume.status)}
@@ -221,7 +226,12 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
                     <div className="p-4">
                       <p className="font-medium text-sm truncate">{resume.fileName}</p>
                       <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(resume.uploadDate)}</p>
+                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(
+                                                                        typeof resume.uploadDate === 'string'
+                                                                          ? resume.uploadDate
+                                                                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                                                                      )
+                                                                      }</p>
                       <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                         <span className="flex items-center gap-1">
                           {getStatusIcon(resume.status)}
@@ -266,7 +276,12 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
                     <div className="p-4">
                       <p className="font-medium text-sm truncate">{resume.fileName}</p>
                       <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(resume.uploadDate)}</p>
+                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(
+                                                                        typeof resume.uploadDate === 'string'
+                                                                          ? resume.uploadDate
+                                                                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                                                                      )
+                                                                      }</p>
                       <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                         <span className="flex items-center gap-1">
                           {getStatusIcon(resume.status)}
@@ -305,7 +320,12 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
                   <div className="p-4">
                     <p className="font-medium text-sm truncate">{resume.fileName}</p>
                     <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                    <p className="text-xs text-gray-600">Submitted: {formatDateTime(resume.uploadDate)}</p>
+                    <p className="text-xs text-gray-600">Submitted: {formatDateTime(
+                                                                      typeof resume.uploadDate === 'string'
+                                                                        ? resume.uploadDate
+                                                                        : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                                                                    )
+                                                                    }</p>
                     <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                       <span className="flex items-center gap-1">
                         {getStatusIcon(resume.status)}
