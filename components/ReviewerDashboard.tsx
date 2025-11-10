@@ -1,8 +1,3 @@
-// Contributors:
-//  Luke Arvey - 2 Hours
-//  Ridley Wills - 3 Hours
-//  Tristan Van - 3 Hours
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { NavigationBar } from "./Navigation";
@@ -29,20 +24,57 @@ interface ReviewerDashboardProps {
   onLogout: () => void;
 }
 
-export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: ReviewerDashboardProps) {
+export function ReviewerDashboard({
+  user,
+  resumes: propResumes,
+  onLogout,
+}: ReviewerDashboardProps) {
   const navigate = useNavigate();
   const db = getFirestore(app);
 
   const [fsResumes, setFsResumes] = useState<Resume[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  // notification: count pending / in-review resumes shared with this reviewer
+  const [awaitingReviewCount, setAwaitingReviewCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setAwaitingReviewCount(0);
+      return;
+    }
+
+    const q = query(
+      collection(db, "resumes"),
+      where("sharedWithIds", "array-contains", user.id)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        let count = 0;
+        snapshot.docs.forEach((d) => {
+          const data = d.data() as any;
+          const status = data.status ?? "pending";
+          if (status === "pending" || status === "in-review") count += 1;
+        });
+        setAwaitingReviewCount(count);
+      },
+      () => setAwaitingReviewCount(0)
+    );
+
+    return () => unsub();
+  }, [db, user?.id]);
 
   useEffect(() => {
     setLoading(true);
     setFetchError(null);
 
     try {
-      const q = query(collection(db, "resumes"), where("sharedWithIds", "array-contains", user.id), orderBy("uploadDate", "desc"));
+      const q = query(
+        collection(db, "resumes"),
+        where("sharedWithIds", "array-contains", user.id),
+        orderBy("uploadDate", "desc")
+      );
       const unsub = onSnapshot(
         q,
         (snapshot: QuerySnapshot<DocumentData>) => {
@@ -61,6 +93,7 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
               version: data.version ?? 1,
               downloadURL: data.downloadURL,
               storagePath: data.storagePath,
+              sharedWithIds: data.sharedWithIds ?? [],
               ...data,
             } as Resume;
           });
@@ -68,7 +101,10 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
           setLoading(false);
         },
         (err) => {
-          console.error("[ReviewerDashboard] failed to subscribe to resumes", err);
+          console.error(
+            "[ReviewerDashboard] failed to subscribe to resumes",
+            err
+          );
           setFetchError((err as any)?.message || "Failed to load resumes");
           setLoading(false);
         }
@@ -76,24 +112,25 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
 
       return () => unsub();
     } catch (err) {
-      console.error("[ReviewerDashboard] unexpected error fetching resumes", err);
+      console.error(
+        "[ReviewerDashboard] unexpected error fetching resumes",
+        err
+      );
       setFetchError((err as any)?.message || "Failed to load resumes");
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db]);
+  }, [db, user?.id]);
 
   const allResumes = fsResumes ?? propResumes ?? [];
 
-  //const newSubmissions = allResumes.filter((r) => r.status === "pending");
-  //const approvedResumes = allResumes.filter((r) => r.status === "approved");
   const newSubmissions = allResumes.filter(
     (r) => r.status === "pending" && r.sharedWithIds?.includes(user.id)
   );
 
   const approvedResumes = allResumes.filter(
     (r) => r.status === "approved" && r.sharedWithIds?.includes(user.id)
-  ); 
+  );
 
   const resumesInProgress = allResumes.filter(
     (r) => r.status === "in-review" && r.sharedWithIds?.includes(user.id)
@@ -102,7 +139,6 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
   const reviewedResumes = allResumes.filter(
     (r) => r.status === "reviewed" && r.sharedWithIds?.includes(user.id)
   );
-
 
   const getStatusIcon = (status: Resume["status"]) => {
     switch (status) {
@@ -143,6 +179,11 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
       hour12: true,
     });
 
+  const needsReviewFor = (r: Resume) =>
+    r.status === "pending" || r.status === "in-review";
+
+  const getCommentCount = (r: Resume) => (r.comments ?? []).length;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -157,175 +198,350 @@ export function ReviewerDashboard({ user, resumes: propResumes, onLogout }: Revi
 
       <div className="px-[79px] pt-[20px] pb-16">
         <div className="mb-12">
+          {awaitingReviewCount > 0 && (
+            <div className="mb-6 p-4 rounded bg-yellow-50 border border-yellow-100 text-sm flex items-center justify-between">
+              <div>
+                <strong className="mr-2">New submissions:</strong>
+                {awaitingReviewCount} resume
+                {awaitingReviewCount !== 1 ? "s" : ""} need your review.
+              </div>
+            </div>
+          )}
           <h1 className="text-[64px] font-bold text-black tracking-[-1.28px] leading-normal mb-2">
             Welcome, {user.name}
           </h1>
-          <p className="text-[24px] text-[rgba(0,0,0,0.75)] mb-8">All uploaded resumes</p>
+          <p className="text-[24px] text-[rgba(0,0,0,0.75)] mb-8">
+            All uploaded resumes
+          </p>
         </div>
-
         {fetchError && <p className="mb-6 text-red-600">Error: {fetchError}</p>}
 
         {/* Resumes in Progress */}
         {resumesInProgress.length > 0 && (
           <section className="mb-16">
-            <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">Resumes in Progress</h2>
+            <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
+              Resumes in Progress
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {resumesInProgress.map((resume) => (
-                <Card key={resume.id} className="cursor-pointer hover:shadow-lg transition-shadow border border-black" onClick={() => navigate(`/review/${resume.id}`)}>
-                  <CardContent className="p-0">
-                    <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                      {resume.downloadURL ? (
-                        <object data={resume.downloadURL} type="application/pdf" width="100%" height="100%">
-                          <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
-                        </object>
-                      ) : (
-                        <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
+              {resumesInProgress.map((resume) => {
+                const needs = needsReviewFor(resume);
+                const comments = getCommentCount(resume);
+                return (
+                  <Card
+                    key={resume.id}
+                    className="relative cursor-pointer hover:shadow-lg transition-shadow border border-black"
+                    onClick={() => navigate(`/review/${resume.id}`)}
+                  >
+                    <CardContent className="p-0">
+                      {needs && (
+                        <div className="absolute top-3 right-3 z-10">
+                          <span
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-600 text-white text-xs font-semibold"
+                            aria-label="Needs review"
+                          >
+                            !
+                          </span>
+                        </div>
                       )}
-                    </div>
-                    <div className="p-4">
-                      <p className="font-medium text-sm truncate">{resume.fileName}</p>
-                      <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(
-                                                                        typeof resume.uploadDate === 'string'
-                                                                          ? resume.uploadDate
-                                                                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
-                                                                      )
-                                                                      }</p>
-                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
-                        <span className="flex items-center gap-1">
-                          {getStatusIcon(resume.status)}
-                          In Progress
-                        </span>
-                      </Badge>
-                      {resume.comments.length > 0 && <p className="text-xs text-blue-600 mt-1">{resume.comments.length} comment{resume.comments.length !== 1 ? "s" : ""} added</p>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      {comments > 0 && (
+                        <div className="absolute top-3 left-3 z-10">
+                          <span
+                            className="inline-flex items-center justify-center min-w-[22px] h-6 px-1 rounded-full bg-blue-600 text-white text-xs font-semibold"
+                            aria-label={`${comments} comment${comments !== 1 ? "s" : ""}`}
+                          >
+                            {comments > 9 ? "9+" : comments}
+                          </span>
+                        </div>
+                      )}
+                      <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
+                        {resume.downloadURL ? (
+                          <object
+                            data={resume.downloadURL}
+                            type="application/pdf"
+                            width="100%"
+                            height="100%"
+                          >
+                            <ImageWithFallback
+                              src="/placeholder-resume.png"
+                              alt={resume.fileName}
+                              className="w-full h-full object-cover"
+                            />
+                          </object>
+                        ) : (
+                          <ImageWithFallback
+                            src="/placeholder-resume.png"
+                            alt={resume.fileName}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <p className="font-medium text-sm truncate">
+                          {resume.fileName}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Student: {resume.studentName}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Submitted: {formatDateTime(
+                            typeof resume.uploadDate === 'string'
+                              ? resume.uploadDate
+                              : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                          )
+                          }
+                        </p>
+                        <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
+                          <span className="flex items-center gap-1">
+                            {getStatusIcon(resume.status)}
+                            In Progress
+                          </span>
+                        </Badge>
+                        {comments > 0 && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            {comments} comment{comments !== 1 ? "s" : ""} added
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </section>
         )}
 
         {/* Newly Submitted */}
         <section className="mb-16">
-          <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">New Submissions</h2>
+          <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
+            New Submissions
+          </h2>
           {newSubmissions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {newSubmissions.map((resume) => (
-                <Card key={resume.id} className="cursor-pointer hover:shadow-lg transition-shadow border border-black" onClick={() => navigate(`/review/${resume.id}`)}>
-                  <CardContent className="p-0">
-                    <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                      {resume.downloadURL ? (
-                        <object data={resume.downloadURL} type="application/pdf" width="100%" height="100%">
-                          <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
-                        </object>
-                      ) : (
-                        <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
+              {newSubmissions.map((resume) => {
+                const needs = needsReviewFor(resume);
+                const comments = getCommentCount(resume);
+                return (
+                  <Card
+                    key={resume.id}
+                    className="relative cursor-pointer hover:shadow-lg transition-shadow border border-black"
+                    onClick={() => navigate(`/review/${resume.id}`)}
+                  >
+                    <CardContent className="p-0">
+                      {needs && (
+                        <div className="absolute top-3 right-3 z-10">
+                          <span
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-600 text-white text-xs font-semibold"
+                            aria-label="Needs review"
+                          >
+                            !
+                          </span>
+                        </div>
                       )}
-                    </div>
-                    <div className="p-4">
-                      <p className="font-medium text-sm truncate">{resume.fileName}</p>
-                      <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(
-                                                                        typeof resume.uploadDate === 'string'
-                                                                          ? resume.uploadDate
-                                                                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
-                                                                      )
-                                                                      }</p>
-                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
-                        <span className="flex items-center gap-1">
-                          {getStatusIcon(resume.status)}
-                          Pending Review
-                        </span>
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      {comments > 0 && (
+                        <div className="absolute top-3 left-3 z-10">
+                          <span
+                            className="inline-flex items-center justify-center min-w-[22px] h-6 px-1 rounded-full bg-blue-600 text-white text-xs font-semibold"
+                            aria-label={`${comments} comment${comments !== 1 ? "s" : ""}`}
+                          >
+                            {comments > 9 ? "9+" : comments}
+                          </span>
+                        </div>
+                      )}
+                      <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
+                        {resume.downloadURL ? (
+                          <object
+                            data={resume.downloadURL}
+                            type="application/pdf"
+                            width="100%"
+                            height="100%"
+                          >
+                            <ImageWithFallback
+                              src="/placeholder-resume.png"
+                              alt={resume.fileName}
+                              className="w-full h-full object-cover"
+                            />
+                          </object>
+                        ) : (
+                          <ImageWithFallback
+                            src="/placeholder-resume.png"
+                            alt={resume.fileName}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <p className="font-medium text-sm truncate">
+                          {resume.fileName}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Student: {resume.studentName}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Submitted: {formatDateTime(
+                            typeof resume.uploadDate === 'string'
+                              ? resume.uploadDate
+                              : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                          )
+                          }
+                        </p>
+                        <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
+                          <span className="flex items-center gap-1">
+                            {getStatusIcon(resume.status)}
+                            Pending Review
+                          </span>
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="bg-gray-50 rounded-lg p-12 text-center">
               <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-600 mb-2">No new submissions</h3>
-              <p className="text-gray-500">New resume submissions will appear here for review.</p>
+              <h3 className="text-xl font-medium text-gray-600 mb-2">
+                No new submissions
+              </h3>
+              <p className="text-gray-500">
+                New resume submissions will appear here for review.
+              </p>
             </div>
           )}
         </section>
 
-`        {/* Reviewed Resumes */}
-        ``{reviewedResumes.length > 0 && (
+        {/* Reviewed Resumes */}
+        {reviewedResumes.length > 0 && (
           <section className="mb-16">
-            <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">Reviewed Resumes</h2>
+            <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
+              Reviewed Resumes
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {reviewedResumes.map((resume) => (
-                <Card
-                  key={resume.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                  onClick={() => navigate(`/review/${resume.id}`)}
-                >
-                  <CardContent className="p-0">
-                    <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                      {resume.downloadURL ? (
-                        <object data={resume.downloadURL} type="application/pdf" width="100%" height="100%">
-                          <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
-                        </object>
-                      ) : (
-                        <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
+              {reviewedResumes.map((resume) => {
+                const comments = getCommentCount(resume);
+                return (
+                  <Card
+                    key={resume.id}
+                    className="relative cursor-pointer hover:shadow-lg transition-shadow border border-black"
+                    onClick={() => navigate(`/review/${resume.id}`)}
+                  >
+                    <CardContent className="p-0">
+                      {comments > 0 && (
+                        <div className="absolute top-3 left-3 z-10">
+                          <span
+                            className="inline-flex items-center justify-center min-w-[22px] h-6 px-1 rounded-full bg-blue-600 text-white text-xs font-semibold"
+                            aria-label={`${comments} comment${comments !== 1 ? "s" : ""}`}
+                          >
+                            {comments > 9 ? "9+" : comments}
+                          </span>
+                        </div>
                       )}
-                    </div>
-                    <div className="p-4">
-                      <p className="font-medium text-sm truncate">{resume.fileName}</p>
-                      <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                      <p className="text-xs text-gray-600">Submitted: {formatDateTime(
-                                                                        typeof resume.uploadDate === 'string'
-                                                                          ? resume.uploadDate
-                                                                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
-                                                                      )
-                                                                      }</p>
-                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
-                        <span className="flex items-center gap-1">
-                          {getStatusIcon(resume.status)}
-                          Reviewed
-                        </span>
-                      </Badge>
-                      {resume.comments.length > 0 && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          {resume.comments.length} comment{resume.comments.length !== 1 ? "s" : ""} added
+                      <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
+                        {resume.downloadURL ? (
+                          <object
+                            data={resume.downloadURL}
+                            type="application/pdf"
+                            width="100%"
+                            height="100%"
+                          >
+                            <ImageWithFallback
+                              src="/placeholder-resume.png"
+                              alt={resume.fileName}
+                              className="w-full h-full object-cover"
+                            />
+                          </object>
+                        ) : (
+                          <ImageWithFallback
+                            src="/placeholder-resume.png"
+                            alt={resume.fileName}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <p className="font-medium text-sm truncate">
+                          {resume.fileName}
                         </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        <p className="text-xs text-gray-600 mt-1">
+                          Student: {resume.studentName}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Submitted: {formatDateTime(
+                            typeof resume.uploadDate === 'string'
+                              ? resume.uploadDate
+                              : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                          )
+                          }
+                        </p>
+                        <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
+                          <span className="flex items-center gap-1">
+                            {getStatusIcon(resume.status)}
+                            Reviewed
+                          </span>
+                        </Badge>
+                        {comments > 0 && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            {comments} comment{comments !== 1 ? "s" : ""} added
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </section>
         )}
 
         {/* Approved Resumes */}
         <section>
-          <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">Approved Resumes</h2>
+          <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
+            Approved Resumes
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {approvedResumes.map((resume) => (
-              <Card key={resume.id} className="cursor-pointer hover:shadow-lg transition-shadow border border-black" onClick={() => navigate(`/review/${resume.id}`)}>
+              <Card
+                key={resume.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
+                onClick={() => navigate(`/review/${resume.id}`)}
+              >
                 <CardContent className="p-0">
                   <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
                     {resume.downloadURL ? (
-                      <object data={resume.downloadURL} type="application/pdf" width="100%" height="100%">
-                        <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
+                      <object
+                        data={resume.downloadURL}
+                        type="application/pdf"
+                        width="100%"
+                        height="100%"
+                      >
+                        <ImageWithFallback
+                          src="/placeholder-resume.png"
+                          alt={resume.fileName}
+                          className="w-full h-full object-cover"
+                        />
                       </object>
                     ) : (
-                      <ImageWithFallback src="/placeholder-resume.png" alt={resume.fileName} className="w-full h-full object-cover" />
+                      <ImageWithFallback
+                        src="/placeholder-resume.png"
+                        alt={resume.fileName}
+                        className="w-full h-full object-cover"
+                      />
                     )}
                   </div>
                   <div className="p-4">
-                    <p className="font-medium text-sm truncate">{resume.fileName}</p>
-                    <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
-                    <p className="text-xs text-gray-600">Submitted: {formatDateTime(
-                                                                      typeof resume.uploadDate === 'string'
-                                                                        ? resume.uploadDate
-                                                                        : resume.uploadDate?.toDate?.().toISOString() ?? ''
-                                                                    )
-                                                                    }</p>
+                    <p className="font-medium text-sm truncate">
+                      {resume.fileName}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Student: {resume.studentName}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Submitted: {formatDateTime(
+                        typeof resume.uploadDate === 'string'
+                          ? resume.uploadDate
+                          : resume.uploadDate?.toDate?.().toISOString() ?? ''
+                      )
+                      }
+                    </p>
                     <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                       <span className="flex items-center gap-1">
                         {getStatusIcon(resume.status)}
