@@ -9,7 +9,18 @@ import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
-import { Plus, FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  Plus,
+  FileText,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Trash2,
+  MoreHorizontal,
+  Share2,
+  Download,
+  Printer,
+} from 'lucide-react';
 import { User, Resume } from '../src/App';
 import { ImageWithFallback } from './ImageWithFallback';
 import app from '../src/firebaseConfig';
@@ -19,13 +30,13 @@ import {
   query,
   where,
   onSnapshot,
-  QuerySnapshot,
-  DocumentData,
+  doc as fsDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 
 interface StudentDashboardProps {
   user: User;
-  resumes: Resume[]; // kept for backward compatibility; Firestore results take precedence
+  resumes: Resume[];
 }
 
 export function StudentDashboard({ user, resumes: propResumes }: StudentDashboardProps) {
@@ -35,6 +46,7 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
   const [fsResumes, setFsResumes] = useState<Resume[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || !user.id) {
@@ -47,15 +59,11 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
     setFetchError(null);
 
     try {
-      // query resumes for the current student, newest first
-      const q = query(
-        collection(db, 'resumes'),
-        where('studentId', '==', user.id),
-      );
+      const q = query(collection(db, 'resumes'), where('studentId', '==', user.id));
 
       const unsub = onSnapshot(
         q,
-        (snapshot: QuerySnapshot<DocumentData>) => {
+        (snapshot) => {
           const items: Resume[] = snapshot.docs.map((doc) => {
             const data = doc.data() as any;
             return {
@@ -69,7 +77,8 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
               reviewerName: data.reviewerName ?? undefined,
               comments: (data.comments ?? []) as any[],
               version: data.version ?? 1,
-              // keep any extra fields for downstream usage
+              downloadURL: data.downloadURL,
+              storagePath: data.storagePath,
               ...data,
             } as Resume;
           });
@@ -78,19 +87,18 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
         },
         (err) => {
           console.error('[StudentDashboard] failed to subscribe to resumes', err);
-          setFetchError((err as any)?.message || 'Failed to load resumes');
+          setFetchError(err.message || 'Failed to load resumes');
           setLoading(false);
         }
       );
 
       return () => unsub();
-    } catch (err) {
+    } catch (err: any) {
       console.error('[StudentDashboard] unexpected error fetching resumes', err);
-      setFetchError((err as any)?.message || 'Failed to load resumes');
+      setFetchError(err.message || 'Failed to load resumes');
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, user?.id]);
+  }, [db, user?.id, user?.name]);
 
   const getStatusIcon = (status: Resume['status']) => {
     switch (status) {
@@ -121,20 +129,47 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
+
+  const handleDelete = async (id: string) => {
+    if (!id) return;
+    if (!window.confirm('Delete this resume? This cannot be undone.')) return;
+    try {
+      await deleteDoc(fsDoc(db, 'resumes', id));
+    } catch (err) {
+      console.error('[StudentDashboard] delete failed', err);
+      alert('Failed to delete. Please try again.');
+    }
   };
 
-  // Prefer Firestore results if available, otherwise fall back to prop
-  const allResumes = fsResumes ?? propResumes ?? [];
+  const handleCopy = async (url?: string) => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      alert('Could not copy link');
+    }
+  };
 
-  const yourResumes = allResumes.filter(r => r.status === 'pending');
-  const submittedResumes = allResumes.filter(r => r.status === 'in-review');
-  const reviewedResumes = allResumes.filter(r => ['reviewed', 'approved'].includes(r.status));
+  const handleDownload = (url?: string) => {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handlePrint = (url?: string) => {
+    if (!url) return;
+    const w = window.open(url, '_blank', 'noopener,noreferrer');
+    w?.print?.();
+  };
+
+  const allResumes = fsResumes ?? propResumes ?? [];
+  const yourResumes = allResumes;
+  const submittedResumes = allResumes.filter((r) => r.status === 'in-review');
+  const reviewedResumes = allResumes.filter((r) => r.status === 'reviewed' || r.status === 'approved');
 
   return (
     <div className="min-h-screen bg-white">
@@ -164,61 +199,128 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
           </div>
         </div>
 
-        {/* optional loading / error */}
         {loading && <p className="mb-6 text-gray-500">Loading your resumes…</p>}
         {fetchError && <p className="mb-6 text-red-600">Error: {fetchError}</p>}
 
-        {/* Your Resumes Section */}
+        {/* Your Resumes (all statuses) */}
         <section className="mb-16">
           <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
             Your Resumes
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {yourResumes.map((resume) => (
-              <Card
-                key={resume.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                onClick={() => navigate(`/resume/${resume.id}`)}
-              >
-                <CardContent className="p-0">
-                  <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                    {resume.downloadURL ? (
-                      <object
-                        data={resume.downloadURL}
-                        type="application/pdf"
-                        width="100%"
-                        height="100%"
-                      >
+            {yourResumes.map((r, idx) => {
+              const uniqueKey = `your-${r.id}-${idx}`;
+              return (
+                <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
+                  <div
+                    className="absolute inset-0 z-10 cursor-pointer"
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      if (target.closest('.action-zone')) return;
+                      navigate(`/resume/${r.id}`);
+                    }}
+                  />
+                  <CardContent className="p-0 overflow-shown rounded-xl">
+                    <div className="relative h-64 bg-gray-100 overflow-hidden">
+                      {r.downloadURL ? (
+                        <embed
+                          src={`${r.downloadURL}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                          type="application/pdf"
+                          className="w-full h-full pointer-events-none"
+                        />
+                      ) : (
                         <ImageWithFallback
                           src="/placeholder-resume.png"
-                          alt={resume.fileName}
+                          alt={r.fileName}
                           className="w-full h-full object-cover"
                         />
-                      </object>
-                    ) : (
-                      <ImageWithFallback
-                        src="/placeholder-resume.png"
-                        alt={resume.fileName}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <p className="font-medium text-sm truncate">{resume.fileName}</p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {formatDate(resume.uploadDate)}
-                    </p>
-                    <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
-                      <span className="flex items-center gap-1">
-                        {getStatusIcon(resume.status)}
-                        {resume.status.charAt(0).toUpperCase() + resume.status.slice(1).replace('-', ' ')}
-                      </span>
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      )}
+                      <div className="pointer-events-none absolute inset-x-0 top-0 h-7 bg-white/95" />
+                      <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-1 bg-white/95" />
+                      <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-2 bg-white/95" />
+                    </div>
+
+                    <div className="p-4 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{r.fileName}</p>
+                        <p className="text-xs text-gray-600 mt-1">{formatDate(r.uploadDate)}</p>
+                        <Badge className={`mt-2 ${getStatusColor(r.status)}`}>
+                          <span className="flex items-center gap-1">
+                            {getStatusIcon(r.status)}
+                            {r.status.charAt(0).toUpperCase() + r.status.slice(1).replace('-', ' ')}
+                          </span>
+                        </Badge>
+                      </div>
+
+                      <div className="relative z-20 flex items-center gap-2 shrink-0 action-zone">
+                        <button
+                          aria-label="Delete resume"
+                          className="px-2 py-1 rounded border border-red-200 bg-white hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(r.id!);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+
+                        <div className="relative">
+                          <button
+                            aria-label="More actions"
+                            className="px-2 py-1 rounded border bg-white hover:bg-gray-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === uniqueKey ? null : uniqueKey);
+                            }}
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+
+                          {openMenuId === uniqueKey && (
+                            <div
+                              className="absolute right-0 top-full mt-1 w-44 rounded border bg-white shadow-lg z-50"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(r.downloadURL);
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                <Share2 className="w-4 h-4" /> Copy link
+                              </button>
+                              <button
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownload(r.downloadURL);
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                <Download className="w-4 h-4" /> Download
+                              </button>
+                              <button
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePrint(r.downloadURL);
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                <Printer className="w-4 h-4" /> Print
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
 
             {/* Upload New Card */}
             <Card
@@ -240,125 +342,247 @@ export function StudentDashboard({ user, resumes: propResumes }: StudentDashboar
           </div>
         </section>
 
-        {/* Submitted For Review Section */}
+        {/* Submitted For Review */}
         {submittedResumes.length > 0 && (
           <section className="mb-16">
             <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
               Submitted For Review
             </h2>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {submittedResumes.map((resume) => (
-                <Card
-                  key={resume.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                  onClick={() => navigate(`/resume/${resume.id}`)}
-                >
-                  <CardContent className="p-0">
-                    <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                      {resume.downloadURL ? (
-                        <object
-                          data={resume.downloadURL}
-                          type="application/pdf"
-                          width="100%"
-                          height="100%"
-                        >
+              {submittedResumes.map((r, idx) => {
+                const uniqueKey = `submitted-${r.id}-${idx}`;
+                return (
+                  <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
+                    <div
+                      className="absolute inset-0 z-10 cursor-pointer"
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('.action-zone')) return;
+                        navigate(`/resume/${r.id}`);
+                      }}
+                    />
+                    <CardContent className="p-0 overflow-shown rounded-xl">
+                      <div className="relative h-64 bg-gray-100 overflow-hidden">
+                        {r.downloadURL ? (
+                          <embed
+                            src={`${r.downloadURL}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                            type="application/pdf"
+                            className="w-full h-full pointer-events-none"
+                          />
+                        ) : (
                           <ImageWithFallback
                             src="/placeholder-resume.png"
-                            alt={resume.fileName}
+                            alt={r.fileName}
                             className="w-full h-full object-cover"
                           />
-                        </object>
-                      ) : (
-                        <ImageWithFallback
-                          src="/placeholder-resume.png"
-                          alt={resume.fileName}
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <p className="font-medium text-sm truncate">{resume.fileName}</p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Reviewer: {resume.reviewerName}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {formatDate(resume.uploadDate)}
-                      </p>
-                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
-                        <span className="flex items-center gap-1">
-                          {getStatusIcon(resume.status)}
-                          In Review
-                        </span>
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        )}
+                        <div className="pointer-events-none absolute inset-x-0 top-0 h-7 bg-white/95" />
+                        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-1 bg-white/95" />
+                        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-2 bg-white/95" />
+                      </div>
+
+                      <div className="p-4 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{r.fileName}</p>
+                          <p className="text-xs text-gray-600 mt-1">{formatDate(r.uploadDate)}</p>
+                          <Badge className={`mt-2 ${getStatusColor(r.status)}`}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(r.status)}
+                              {r.status.charAt(0).toUpperCase() + r.status.slice(1).replace('-', ' ')}
+                            </span>
+                          </Badge>
+                        </div>
+
+                        <div className="relative z-20 flex items-center gap-2 shrink-0 action-zone">
+                          <button
+                            aria-label="Delete resume"
+                            className="px-2 py-1 rounded border border-red-200 bg-white hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(r.id!);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </button>
+
+                          <div className="relative">
+                            <button
+                              aria-label="More actions"
+                              className="px-2 py-1 rounded border bg-white hover:bg-gray-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(openMenuId === uniqueKey ? null : uniqueKey);
+                              }}
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+
+                    {openMenuId === uniqueKey && (
+                      <div
+                        className="absolute right-0 top-full mt-1 w-44 rounded border bg-white shadow-lg z-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy(r.downloadURL);
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <Share2 className="w-4 h-4" /> Copy link
+                        </button>
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(r.downloadURL);
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <Download className="w-4 h-4" /> Download
+                        </button>
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrint(r.downloadURL);
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <Printer className="w-4 h-4" /> Print
+                        </button>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           </section>
         )}
 
-        {/* Reviewed Resumes Section */}
+        {/* Reviewed / Approved */}
         {reviewedResumes.length > 0 && (
           <section>
             <h2 className="text-[48px] font-semibold text-black tracking-[-0.96px] mb-8">
               Reviewed Resumes
             </h2>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {reviewedResumes.map((resume) => (
-                <Card
-                  key={resume.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow border border-black"
-                  onClick={() => navigate(`/resume/${resume.id}`)}
-                >
-                  <CardContent className="p-0">
-                    <div className="h-64 bg-gray-100 border-b border-black flex items-center justify-center">
-                      {resume.downloadURL ? (
-                        <object
-                          data={resume.downloadURL}
-                          type="application/pdf"
-                          width="100%"
-                          height="100%"
-                        >
+              {reviewedResumes.map((r, idx) => {
+                const uniqueKey = `reviewed-${r.id}-${idx}`;
+                return (
+                  <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
+                    <div
+                      className="absolute inset-0 z-10 cursor-pointer"
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('.action-zone')) return;
+                        navigate(`/resume/${r.id}`);
+                      }}
+                    />
+                    <CardContent className="p-0 overflow-shown rounded-xl">
+                      <div className="relative h-64 bg-gray-100 overflow-hidden">
+                        {r.downloadURL ? (
+                          <embed
+                            src={`${r.downloadURL}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                            type="application/pdf"
+                            className="w-full h-full pointer-events-none"
+                          />
+                        ) : (
                           <ImageWithFallback
                             src="/placeholder-resume.png"
-                            alt={resume.fileName}
+                            alt={r.fileName}
                             className="w-full h-full object-cover"
                           />
-                        </object>
-                      ) : (
-                        <ImageWithFallback
-                          src="/placeholder-resume.png"
-                          alt={resume.fileName}
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <p className="font-medium text-sm truncate">{resume.fileName}</p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Reviewed by: {resume.reviewerName}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {formatDate(resume.uploadDate)}
-                      </p>
-                      <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
-                        <span className="flex items-center gap-1">
-                          {getStatusIcon(resume.status)}
-                          {resume.status === 'approved' ? 'Approved' : 'Reviewed'}
-                        </span>
-                      </Badge>
-                      {resume.comments.length > 0 && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          {resume.comments.length} comment{resume.comments.length !== 1 ? 's' : ''}
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        )}
+                        <div className="pointer-events-none absolute inset-x-0 top-0 h-7 bg-white/95" />
+                        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-1 bg-white/95" />
+                        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-2 bg-white/95" />
+                      </div>
+
+                      <div className="p-4 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{r.fileName}</p>
+                          <p className="text-xs text-gray-600 mt-1">{formatDate(r.uploadDate)}</p>
+                          <Badge className={`mt-2 ${getStatusColor(r.status)}`}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(r.status)}
+                              {r.status.charAt(0).toUpperCase() + r.status.slice(1).replace('-', ' ')}
+                            </span>
+                          </Badge>
+                        </div>
+
+                        <div className="relative z-20 flex items-center gap-2 shrink-0 action-zone">
+                          <button
+                            aria-label="Delete resume"
+                            className="px-2 py-1 rounded border border-red-200 bg-white hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(r.id!);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </button>
+
+                          <div className="relative">
+                            <button
+                              aria-label="More actions"
+                              className="px-2 py-1 rounded border bg-white hover:bg-gray-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(openMenuId === uniqueKey ? null : uniqueKey);
+                              }}
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    {openMenuId === uniqueKey && (
+                      <div
+                        className="absolute right-0 top-full mt-1 w-44 rounded border bg-white shadow-lg z-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy(r.downloadURL);
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <Share2 className="w-4 h-4" /> Copy link
+                        </button>
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(r.downloadURL);
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <Download className="w-4 h-4" /> Download
+                        </button>
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrint(r.downloadURL);
+                            setOpenMenuId(null);
+                          }}
+                        >
+                          <Printer className="w-4 h-4" /> Print
+                        </button>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           </section>
         )}
