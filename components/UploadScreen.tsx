@@ -101,9 +101,10 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
   // ---------------- File Handling (with Firebase) ----------------
   const handleFileSelect = (files: FileList | null) => {
-    if (!files) return;
-    const newFiles: UploadFile[] = [];
+  if (!files) return;
+  const newFiles: UploadFile[] = [];
 
+<<<<<<< HEAD
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const error = validateFile(file);
@@ -117,6 +118,21 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
     setUploadFiles(newFiles);
   };
+=======
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const error = validateFile(file);
+    newFiles.push({
+      file,
+      progress: 0,
+      status: error ? "error" : "success", // mark as "success" pre-upload-ready
+      error,
+    });
+  }
+
+  setUploadFiles(newFiles);
+};
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 
   const startUpload = async (validFiles: UploadFile[]) => {
     if (!user) {
@@ -476,10 +492,18 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
               {/* Upload Button */}
               <div className="mt-8 text-center">
                 <Button
+<<<<<<< HEAD
                   className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${uploadFiles.length > 0 && !isUploading
                       ? "bg-blue-600 hover:bg-blue-700 text-white"
                       : "bg-neutral-700 text-white"
                     }`}
+=======
+                  className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${
+                    uploadFiles.length > 0 && !isUploading
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "bg-neutral-700 text-white"
+                  }`}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                   disabled={isUploading}
                   onClick={() => {
                     if (uploadFiles.length === 0) {

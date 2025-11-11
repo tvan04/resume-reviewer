@@ -3,11 +3,19 @@
 //  Ridley Wills - 3 Hours
 //  Tristan Van - 3 Hours
 
+<<<<<<< HEAD
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavigationBar } from './Navigation';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
+=======
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { NavigationBar } from "./Navigation";
+import { Card, CardContent } from "./ui/card";
+import { Badge } from "./ui/badge";
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 import {
   Clock,
   CheckCircle,
@@ -17,10 +25,17 @@ import {
   Share2,
   Download,
   Printer,
+<<<<<<< HEAD
 } from 'lucide-react';
 import { User, Resume } from '../src/App';
 import { ImageWithFallback } from './ImageWithFallback';
 import app from '../src/firebaseConfig';
+=======
+} from "lucide-react";
+import { User, Resume } from "../src/App";
+import { ImageWithFallback } from "./ImageWithFallback";
+import app from "../src/firebaseConfig";
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 import {
   getFirestore,
   collection,
@@ -50,6 +65,7 @@ export function ReviewerDashboard({
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+<<<<<<< HEAD
 
   // notification: count pending / in-review resumes shared with this reviewer
   const [awaitingReviewCount, setAwaitingReviewCount] = useState(0);
@@ -86,6 +102,8 @@ export function ReviewerDashboard({
       }
     };
   }, [db, user?.id]);
+=======
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 
   useEffect(() => {
     setLoading(true);
@@ -93,9 +111,15 @@ export function ReviewerDashboard({
 
     try {
       const q = query(
+<<<<<<< HEAD
         collection(db, 'resumes'),
         where('sharedWithIds', 'array-contains', user.id),
         orderBy('uploadDate', 'desc')
+=======
+        collection(db, "resumes"),
+        where("sharedWithIds", "array-contains", user.id),
+        orderBy("uploadDate", "desc")
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
       );
 
       const unsub = onSnapshot(
@@ -158,7 +182,11 @@ export function ReviewerDashboard({
   );
 
   const approvedResumes = allResumes.filter(
+<<<<<<< HEAD
     (r) => r.status === 'approved' && r.sharedWithIds?.includes(user.id)
+=======
+    (r) => r.status === "approved" && r.sharedWithIds?.includes(user.id)
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
   );
 
   const getStatusIcon = (status: Resume['status']) => {
@@ -225,13 +253,24 @@ export function ReviewerDashboard({
 
   const getCommentCount = (r: Resume) => (r.comments ?? []).length;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <p className="text-gray-600">Loading resumes…</p>
-      </div>
-    );
-  }
+  const handleCopy = async (url?: string) => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      alert('Could not copy link');
+    }
+  };
+
+  const handleDownload = (url?: string) => {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handlePrint = (url?: string) => {
+    if (!url) return;
+    const w = window.open(url, '_blank', 'noopener,noreferrer');
+    w?.print?.();
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -268,6 +307,7 @@ export function ReviewerDashboard({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {resumesInProgress.map((resume, idx) => {
                 const uniqueKey = `in-progress-${resume.id}-${idx}`;
+<<<<<<< HEAD
                 const needs = needsReviewFor(resume);
                 const comments = getCommentCount(resume);
                 return (
@@ -292,6 +332,10 @@ export function ReviewerDashboard({
                         </span>
                       </div>
                     )}
+=======
+                return (
+                  <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black overflow-visible">
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                     <div
                       className="absolute inset-0 z-10 cursor-pointer"
                       onClick={(e) => {
@@ -324,15 +368,20 @@ export function ReviewerDashboard({
                           <p className="font-medium text-sm truncate">{resume.fileName}</p>
                           <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
                           <p className="text-xs text-gray-600">
+<<<<<<< HEAD
                             Submitted: {formatDateTime(
                               typeof resume.uploadDate === 'string'
                                 ? resume.uploadDate
                                 : resume.uploadDate?.toDate?.().toISOString() ?? ''
                             )}
+=======
+                            Submitted: {formatDateTime(resume.uploadDate)}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                           </p>
                           <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                             <span className="flex items-center gap-1">
                               {getStatusIcon(resume.status)}
+<<<<<<< HEAD
                               In Progress
                             </span>
                           </Badge>
@@ -341,6 +390,17 @@ export function ReviewerDashboard({
                               {comments} comment{comments !== 1 ? 's' : ''} added
                             </p>
                           )}
+=======
+                              {resume.status === 'approved'
+                                ? 'Approved'
+                                : resume.status === 'reviewed'
+                                  ? 'Reviewed'
+                                  : resume.status === 'in-review'
+                                    ? 'In Progress'
+                                    : 'Pending Review'}
+                            </span>
+                          </Badge>
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                         </div>
                         <div className="relative z-20 flex items-center gap-2 shrink-0 action-zone">
                           <div className="relative">
@@ -412,6 +472,7 @@ export function ReviewerDashboard({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {newSubmissions.map((resume, idx) => {
                 const uniqueKey = `new-${resume.id}-${idx}`;
+<<<<<<< HEAD
                 const needs = needsReviewFor(resume);
                 const comments = getCommentCount(resume);
                 return (
@@ -436,6 +497,10 @@ export function ReviewerDashboard({
                         </span>
                       </div>
                     )}
+=======
+                return (
+                  <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black overflow-visible">
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                     <div
                       className="absolute inset-0 z-10 cursor-pointer"
                       onClick={(e) => {
@@ -468,16 +533,30 @@ export function ReviewerDashboard({
                           <p className="font-medium text-sm truncate">{resume.fileName}</p>
                           <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
                           <p className="text-xs text-gray-600">
+<<<<<<< HEAD
                             Submitted: {formatDateTime(
                               typeof resume.uploadDate === 'string'
                                 ? resume.uploadDate
                                 : resume.uploadDate?.toDate?.().toISOString() ?? ''
                             )}
+=======
+                            Submitted: {formatDateTime(resume.uploadDate)}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                           </p>
                           <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
                             <span className="flex items-center gap-1">
                               {getStatusIcon(resume.status)}
+<<<<<<< HEAD
                               Pending Review
+=======
+                              {resume.status === 'approved'
+                                ? 'Approved'
+                                : resume.status === 'reviewed'
+                                  ? 'Reviewed'
+                                  : resume.status === 'in-review'
+                                    ? 'In Progress'
+                                    : 'Pending Review'}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                             </span>
                           </Badge>
                         </div>
@@ -561,6 +640,7 @@ export function ReviewerDashboard({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {reviewedResumes.map((resume, idx) => {
                 const uniqueKey = `reviewed-${resume.id}-${idx}`;
+<<<<<<< HEAD
                 const comments = getCommentCount(resume);
                 return (
                   <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black overflow-visible">
@@ -574,6 +654,10 @@ export function ReviewerDashboard({
                         </span>
                       </div>
                     )}
+=======
+                return (
+                  <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black overflow-visible">
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                     <div
                       className="absolute inset-0 z-10 cursor-pointer"
                       onClick={(e) => {
@@ -582,7 +666,11 @@ export function ReviewerDashboard({
                         navigate(`/review/${resume.id}`);
                       }}
                     />
+<<<<<<< HEAD
                     <CardContent className="p-0 overflow-visible rounded-xl">
+=======
+                    <CardContent className="p-0 overflow-visible rounded-xl">{/* was overflow-shown */}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                       <div className="relative h-64 bg-gray-100 overflow-hidden">
                         {resume.downloadURL ? (
                           <embed
@@ -606,6 +694,7 @@ export function ReviewerDashboard({
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">{resume.fileName}</p>
                           <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
+<<<<<<< HEAD
                           <p className="text-xs text-gray-600">
                             Submitted: {formatDateTime(
                               typeof resume.uploadDate === 'string'
@@ -626,6 +715,24 @@ export function ReviewerDashboard({
                           )}
                         </div>
 
+=======
+                          <p className="text-xs text-gray-600">Submitted: {formatDateTime(resume.uploadDate)}</p>
+                          <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(resume.status)}
+                              {resume.status === 'approved'
+                                ? 'Approved'
+                                : resume.status === 'reviewed'
+                                  ? 'Reviewed'
+                                  : resume.status === 'in-review'
+                                    ? 'In Progress'
+                                    : 'Pending Review'}
+                            </span>
+                          </Badge>
+                        </div>
+
+                        {/* Action zone */}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                         <div className="relative z-20 flex items-center gap-2 shrink-0 action-zone">
                           <div className="relative">
                             <button
@@ -703,7 +810,11 @@ export function ReviewerDashboard({
                         navigate(`/review/${resume.id}`);
                       }}
                     />
+<<<<<<< HEAD
                     <CardContent className="p-0 overflow-visible rounded-xl">
+=======
+                    <CardContent className="p-0 overflow-visible rounded-xl">{/* was overflow-shown */}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                       <div className="relative h-64 bg-gray-100 overflow-hidden">
                         {resume.downloadURL ? (
                           <embed
@@ -727,6 +838,7 @@ export function ReviewerDashboard({
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">{resume.fileName}</p>
                           <p className="text-xs text-gray-600 mt-1">Student: {resume.studentName}</p>
+<<<<<<< HEAD
                           <p className="text-xs text-gray-600">
                             Submitted: {formatDateTime(
                               typeof resume.uploadDate === 'string'
@@ -738,10 +850,27 @@ export function ReviewerDashboard({
                             <span className="flex items-center gap-1">
                               {getStatusIcon(resume.status)}
                               {resume.status === 'approved' ? 'Approved' : 'Reviewed'}
+=======
+                          <p className="text-xs text-gray-600">Submitted: {formatDateTime(resume.uploadDate)}</p>
+                          <Badge className={`mt-2 ${getStatusColor(resume.status)}`}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(resume.status)}
+                              {resume.status === 'approved'
+                                ? 'Approved'
+                                : resume.status === 'reviewed'
+                                  ? 'Reviewed'
+                                  : resume.status === 'in-review'
+                                    ? 'In Progress'
+                                    : 'Pending Review'}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                             </span>
                           </Badge>
                         </div>
 
+<<<<<<< HEAD
+=======
+                        {/* Action zone */}
+>>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                         <div className="relative z-20 flex items-center gap-2 shrink-0 action-zone">
                           <div className="relative">
                             <button
