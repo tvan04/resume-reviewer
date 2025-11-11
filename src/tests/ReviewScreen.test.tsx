@@ -7,6 +7,11 @@ import { ReviewScreen } from "../../components/ReviewScreen";
 const mockNavigate = jest.fn();
 const mockUseParams = jest.fn();
 
+beforeAll(() => {
+  window.alert = jest.fn();
+  window.confirm = jest.fn(() => true);
+});
+
 jest.mock("react-router-dom", () => ({
   ...jest.requireActual("react-router-dom"),
   useNavigate: () => mockNavigate,
@@ -239,4 +244,148 @@ describe("ReviewScreen", () => {
     fireEvent.click(screen.getByText(/Back to Dashboard/i));
     expect(mockNavigate).toHaveBeenCalledWith("/reviewer");
   });
+
+  it("shows alert when addCommentToResume fails", async () => {
+    mockUseParams.mockReturnValue({ id: "resume123" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+    mockAddCommentToResume.mockRejectedValueOnce(new Error("Firestore failure"));
+
+    render(
+      <MemoryRouter>
+        <ReviewScreen user={mockUser} onAddComment={jest.fn()} onStatusUpdate={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => screen.getByPlaceholderText(/Provide constructive feedback/i));
+
+    fireEvent.change(screen.getByPlaceholderText(/Provide constructive feedback/i), {
+      target: { value: "Bad data" },
+    });
+    fireEvent.click(screen.getByText(/Add Comment/i));
+
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith("Failed to add comment");
+    });
+  });
+
+
+  it("alerts when updateResumeStatus fails", async () => {
+    mockUseParams.mockReturnValue({ id: "resume123" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+    mockUpdateResumeStatus.mockRejectedValueOnce(new Error("Status failure"));
+
+    render(
+      <MemoryRouter>
+        <ReviewScreen user={mockUser} onAddComment={jest.fn()} onStatusUpdate={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => screen.getByText(/Reviewing: resume.pdf/i));
+
+    // Trigger a status change via dropdown
+    const trigger = screen.getByRole("combobox");
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByText(/^Approved$/i));
+
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith("Failed to update status");
+    });
+  });
+
+  it("does not delete comment if user cancels confirmation", async () => {
+    mockUseParams.mockReturnValue({ id: "resume123" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+    (window.confirm as jest.Mock).mockReturnValueOnce(false);
+
+    render(
+      <MemoryRouter>
+        <ReviewScreen user={mockUser} onAddComment={jest.fn()} onStatusUpdate={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => screen.getByText(/Delete/i));
+    fireEvent.click(screen.getByText(/Delete/i));
+
+    expect(mockDeleteCommentFromResume).not.toHaveBeenCalled();
+  });
+
+  it("alerts when deleteCommentFromResume fails", async () => {
+    mockUseParams.mockReturnValue({ id: "resume123" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+    (window.confirm as jest.Mock).mockReturnValueOnce(true);
+    mockDeleteCommentFromResume.mockRejectedValueOnce(new Error("Delete failed"));
+
+    render(
+      <MemoryRouter>
+        <ReviewScreen user={mockUser} onAddComment={jest.fn()} onStatusUpdate={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => screen.getByText(/Delete/i));
+    fireEvent.click(screen.getByText(/Delete/i));
+
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith("Failed to delete comment");
+    });
+  });
+
+  it("alerts when editCommentInResume fails", async () => {
+    mockUseParams.mockReturnValue({ id: "resume123" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+    mockEditCommentInResume.mockRejectedValueOnce(new Error("Edit failed"));
+
+    render(
+      <MemoryRouter>
+        <ReviewScreen user={mockUser} onAddComment={jest.fn()} onStatusUpdate={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => screen.getByText(/Edit/i));
+    fireEvent.click(screen.getByText(/Edit/i));
+    const textarea = screen.getByDisplayValue(/Looks good/i);
+    fireEvent.change(textarea, { target: { value: "Bad edit" } });
+    fireEvent.click(screen.getByText(/Save/i));
+
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith("Failed to edit comment");
+    });
+  });
+
+  it("renders empty comment state correctly", async () => {
+    const noCommentsResume = { ...mockResume, comments: [] };
+
+    mockUseParams.mockReturnValue({ id: "resume123" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(noCommentsResume);
+      return jest.fn();
+    });
+
+    render(
+      <MemoryRouter>
+        <ReviewScreen user={mockUser} onAddComment={jest.fn()} onStatusUpdate={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/No comments yet/i)).toBeInTheDocument();
+      const addFeedbackMatches = screen.getAllByText(/Add feedback/i);
+      expect(addFeedbackMatches.length).toBeGreaterThan(0);
+    });
+  });
+
 });

@@ -26,6 +26,7 @@ beforeAll(() => {
     // Otherwise, print the message normally using the original console
     process.stderr.write(msg + "\n");
   });
+  window.alert = jest.fn();
 });
 
 
@@ -249,4 +250,153 @@ describe("ResumeViewScreen", () => {
 
     await waitFor(() => expect(mockUpdateDoc).toHaveBeenCalled());
   });
+
+  it("shows error message when Firestore subscription fails", async () => {
+    mockUseParams.mockReturnValue({ id: "r1" });
+    mockSubscribeToResume.mockImplementation((_id, _next, onError) => {
+      onError("Firestore failed");
+      return jest.fn();
+    });
+
+    render(
+      <MemoryRouter>
+        <ResumeViewScreen user={mockUser} resumes={[]} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/failed/i)).toBeInTheDocument()
+    );
+  });
+
+  it("renders fallback image when downloadURL is missing", async () => {
+    mockUseParams.mockReturnValue({ id: "r1" });
+    const resumeNoURL = { ...mockResume, downloadURL: "" };
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(resumeNoURL);
+      return jest.fn();
+    });
+
+    render(
+      <MemoryRouter>
+        <ResumeViewScreen user={mockUser} resumes={[]} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByAltText(/resume.pdf/i)).toBeInTheDocument()
+    );
+  });
+
+  it("alerts when replacing with non-PDF file", async () => {
+    mockUseParams.mockReturnValue({ id: "r1" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+
+    window.alert = jest.fn();
+
+    render(
+      <MemoryRouter>
+        <ResumeViewScreen user={mockUser} resumes={[]} />
+      </MemoryRouter>
+    );
+
+    const badFile = new File(["text"], "resume.txt", { type: "text/plain" });
+    const fileInput = document.getElementById("replaceFileInput") as HTMLInputElement;
+    Object.defineProperty(fileInput, "files", { value: [badFile] });
+    fireEvent.change(fileInput);
+
+    await waitFor(() => {
+      fireEvent.click(screen.getAllByRole("button", { name: /Replace Resume/i })[0]);
+    });
+
+    expect(window.alert).toHaveBeenCalledWith("Please upload a PDF file.");
+  });
+
+
+/*   it("shows alert when uploadBytes throws an error", async () => {
+    mockUseParams.mockReturnValue({ id: "r1" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+    mockUploadBytes.mockRejectedValueOnce(new Error("Upload failed"));
+    window.alert = jest.fn();
+
+    const fakeFile = new File(["data"], "resume.pdf", { type: "application/pdf" });
+
+    render(
+      <MemoryRouter>
+        <ResumeViewScreen user={mockUser} resumes={[]} />
+      </MemoryRouter>
+    );
+
+    const fileInput = document.getElementById("replaceFileInput") as HTMLInputElement;
+    Object.defineProperty(fileInput, "files", { value: [fakeFile] });
+    fireEvent.change(fileInput);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Replace Resume/i })[0]);
+
+    await waitFor(() =>
+      expect(window.alert).toHaveBeenCalledWith(
+        "There was an error replacing the resume. Please try again."
+      )
+    );
+  }); */
+
+  it("does not show Replace Resume for reviewer", async () => {
+    const reviewerUser = { ...mockUser, type: "reviewer" as const };
+    mockUseParams.mockReturnValue({ id: "r1" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+
+    render(
+      <MemoryRouter>
+        <ResumeViewScreen user={reviewerUser} resumes={[]} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Replace Resume/i)).not.toBeInTheDocument()
+    );
+  });
+
+/*   it("alerts when assignReviewer fails", async () => {
+    mockUseParams.mockReturnValue({ id: "r1" });
+    mockSubscribeToResume.mockImplementation((_id, onNext) => {
+      onNext(mockResume);
+      return jest.fn();
+    });
+
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        {
+          id: "rev1",
+          data: () => ({ name: "Reviewer 1", email: "r1@test.com", role: "reviewer" }),
+        },
+      ],
+    });
+
+    mockUpdateDoc.mockRejectedValueOnce(new Error("Firestore failure"));
+
+    render(
+      <MemoryRouter>
+        <ResumeViewScreen user={mockUser} resumes={[]} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => screen.getByRole("combobox"));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "rev1" } });
+
+    const assignButton = screen.getByRole("button", { name: /Assign Reviewer/i });
+    fireEvent.click(assignButton);
+
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith("Failed to assign reviewer. Please try again.");
+    });
+  }); */
 });
