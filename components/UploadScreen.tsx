@@ -101,22 +101,22 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
   // ---------------- File Handling (with Firebase) ----------------
   const handleFileSelect = (files: FileList | null) => {
-  if (!files) return;
-  const newFiles: UploadFile[] = [];
+    if (!files) return;
+    const newFiles: UploadFile[] = [];
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const error = validateFile(file);
-    newFiles.push({
-      file,
-      progress: 0,
-      status: error ? "error" : "success", // mark as "success" pre-upload-ready
-      error,
-    });
-  }
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const error = validateFile(file);
+      newFiles.push({
+        file,
+        progress: 0,
+        status: error ? "error" : "success", // mark as "success" pre-upload-ready
+        error,
+      });
+    }
 
-  setUploadFiles(newFiles);
-};
+    setUploadFiles(newFiles);
+  };
 
   const startUpload = async (validFiles: UploadFile[]) => {
     if (!user) {
@@ -349,11 +349,10 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
               {/* Drag and Drop */}
               <div
-                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
-                  isDragOver
+                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${isDragOver
                     ? "border-blue-400 bg-blue-50"
                     : "border-[rgba(8,133,134,0.3)] bg-[rgba(208,252,253,0.05)]"
-                }`}
+                  }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -477,11 +476,10 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
               {/* Upload Button */}
               <div className="mt-8 text-center">
                 <Button
-                  className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${
-                    uploadFiles.length > 0 && !isUploading
+                  className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${uploadFiles.length > 0 && !isUploading
                       ? "bg-blue-600 hover:bg-blue-700 text-white"
                       : "bg-neutral-700 text-white"
-                  }`}
+                    }`}
                   disabled={isUploading}
                   onClick={() => {
                     if (uploadFiles.length === 0) {
