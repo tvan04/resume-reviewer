@@ -128,7 +128,9 @@ describe("ReviewerDashboard", () => {
     });
 
     expect(screen.getByText(/Resumes in Progress/i)).toBeInTheDocument();
-    expect(screen.getByText(/New Submissions/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /New Submissions/i, level: 2 })
+    ).toBeInTheDocument();
     expect(screen.getByText(/Reviewed Resumes/i)).toBeInTheDocument();
     expect(screen.getByText(/Approved Resumes/i)).toBeInTheDocument();
 

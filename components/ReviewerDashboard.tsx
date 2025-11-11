@@ -62,7 +62,13 @@ export function ReviewerDashboard({
       () => setAwaitingReviewCount(0)
     );
 
-    return () => unsub();
+    return () => {
+      if (typeof unsub === "function") {
+        unsub();
+      } else if (unsub && typeof (unsub as any).unsubscribe === "function") {
+        (unsub as any).unsubscribe();
+      }
+    };
   }, [db, user?.id]);
 
   useEffect(() => {
@@ -109,8 +115,13 @@ export function ReviewerDashboard({
           setLoading(false);
         }
       );
-
-      return () => unsub();
+      return () => {
+        if (typeof unsub === "function") {
+          unsub();
+        } else if (unsub && typeof (unsub as any).unsubscribe === "function") {
+          (unsub as any).unsubscribe();
+        }
+      };
     } catch (err) {
       console.error(
         "[ReviewerDashboard] unexpected error fetching resumes",

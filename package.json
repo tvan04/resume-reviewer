@@ -13,11 +13,10 @@
     "test": "jest",
     "test:ci": "jest --runInBand --ci --coverage"
   },
-    "jest-junit": {
+  "jest-junit": {
     "outputDirectory": ".",
     "outputName": "junit.xml"
   },
-
   "dependencies": {
     "@hookform/resolvers": "^3.3.1",
     "@radix-ui/react-accordion": "^1.1.2",
@@ -109,6 +108,4 @@
   ],
   "author": "Vanderbilt University Career Center",
   "license": "MIT"
-
-  
 }
