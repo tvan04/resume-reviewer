@@ -103,6 +103,7 @@ describe("StudentDashboard Component", () => {
     const mockUnsub = jest.fn();
     jest.spyOn(firestore, "onSnapshot").mockImplementationOnce((q, cb: any) => {
       // simulate 2 unresolved comments
+      q;
       cb({
         docs: [
           {

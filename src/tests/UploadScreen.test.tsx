@@ -1,4 +1,3 @@
-import React from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { UploadScreen } from "../../components/UploadScreen";
@@ -30,6 +29,7 @@ jest.mock("firebase/storage", () => ({
       if (event === "state_changed") {
         progressFn({ bytesTransferred: 50, totalBytes: 100 });
         successFn(); // simulate success immediately
+        errorFn; // no error
       }
     }),
   })),
@@ -105,6 +105,7 @@ describe("UploadScreen", () => {
     );
 
     const uploadButton = screen.getByRole("button", { name: /upload files/i });
+    uploadButton;
     const file = new File(["bad"], "resume.txt", { type: "text/plain" });
 
     const hiddenInput = document.getElementById("file-input") as HTMLInputElement;
