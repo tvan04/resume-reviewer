@@ -1,4 +1,3 @@
-import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { StudentDashboard } from "../../components/StudentDashboard";
@@ -104,6 +103,7 @@ describe("StudentDashboard Component", () => {
     const mockUnsub = jest.fn();
     jest.spyOn(firestore, "onSnapshot").mockImplementationOnce((q, cb: any) => {
       // simulate 2 unresolved comments
+      q;
       cb({
         docs: [
           {

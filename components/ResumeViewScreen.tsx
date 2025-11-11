@@ -29,10 +29,10 @@ import {
 import { ImageWithFallback } from "./ImageWithFallback";
 import { User, Resume } from "../src/App";
 import app, { storage } from "../src/firebaseConfig";
-import { getFirestore, doc as fsDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc as fsDoc, deleteDoc, arrayRemove } from "firebase/firestore";
 import { subscribeToResume, addReplyToComment, toggleCommentResolved } from "./resumeRepo";
-import { collection, getDocs, query, where, updateDoc, onSnapshot, doc, Timestamp } from "firebase/firestore";
-import { arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, getDocs, query, where, updateDoc, Timestamp } from "firebase/firestore";
+import { arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const formatDate = (dateValue: any) => {

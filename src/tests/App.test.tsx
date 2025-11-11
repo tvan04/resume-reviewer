@@ -1,5 +1,6 @@
+// src/tests/App.test.tsx
 import { screen, render } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import App from "../App";
 
 jest.mock("firebase/auth", () => ({
@@ -17,21 +18,6 @@ jest.mock("firebase/firestore", () => ({
 }));
 
 jest.mock("../../src/firebaseConfig", () => ({}));
-
-
-const mockStudent = {
-  id: "1",
-  name: "Alice",
-  email: "alice@vanderbilt.edu",
-  type: "student" as const,
-};
-
-const mockReviewer = {
-  id: "2",
-  name: "Bob",
-  email: "bob@vanderbilt.edu",
-  type: "reviewer" as const,
-};
 
 jest.mock("../../components/StudentDashboard", () => ({
   StudentDashboard: ({ user }: any) => <div>Student Dashboard for {user.name}</div>,
