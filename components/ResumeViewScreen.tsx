@@ -22,6 +22,9 @@ import {
   Share2,
   AlertCircle,
   User as UserIcon,
+  X as XIcon,
+  Plus as PlusIcon,
+  Info as InfoIcon,
 } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { User, Resume } from "../src/App";
@@ -32,17 +35,15 @@ import { collection, getDocs, query, where, updateDoc, Timestamp } from "firebas
 import { arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-
-
 const formatDate = (dateValue: any) => {
   if (!dateValue) return "Unknown date";
 
   const date =
     typeof dateValue === "string"
       ? new Date(dateValue)
-      : dateValue.toDate
-      ? dateValue.toDate()
-      : new Date(dateValue);
+      : (dateValue as any).toDate
+        ? (dateValue as any).toDate()
+        : new Date(dateValue);
 
   return date.toLocaleString("en-US", {
     month: "short",
@@ -102,35 +103,48 @@ interface ResumeViewScreenProps {
   resumes: Resume[]; // still accepted for fallback
 }
 
+type BannerType = "success" | "info" | "error";
+
 export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const db = getFirestore(app);
 
-  // try to load resume from Firestore by id; fall back to props list
+  // Firestore-loaded resume
   const [fsResume, setFsResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState<boolean>(!!id);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // per-comment reply inputs
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
-  const [reviewers, setReviewers] = useState<{ id: string; name: string }[]>([]);
-  const [selectedReviewer, setSelectedReviewer] = useState("");
+
+  // Reviewers directory + UI state (mirrors UploadScreen)
+  const [reviewers, setReviewers] = useState<{ id: string; name: string; email?: string }[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedToAdd, setSelectedToAdd] = useState<string[]>([]);
 
   // Replace Resume states
-const [newFile, setNewFile] = useState<File | null>(null);
-const [uploading, setUploading] = useState(false);
-const [uploadProgress, setUploadProgress] = useState(0);
+  const [newFile, setNewFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Tiny banner state
+  const [banner, setBanner] = useState<{ type: BannerType; message: string } | null>(null);
+  const showBanner = (message: string, type: BannerType = "info", ms = 4000) => {
+    setBanner({ type, message });
+    window.clearTimeout((showBanner as any)._t);
+    (showBanner as any)._t = window.setTimeout(() => setBanner(null), ms);
+  };
+  const dismissBanner = () => setBanner(null);
 
-  // Fetch reviewers from Firestore
+  // Fetch reviewers from Firestore (role === 'reviewer')
   useEffect(() => {
     const fetchReviewers = async () => {
       try {
-        const q = query(collection(db, "users"), where("role", "==", "reviewer"));
-        const querySnapshot = await getDocs(q);
+        const qUsers = query(collection(db, "users"), where("role", "==", "reviewer"));
+        const querySnapshot = await getDocs(qUsers);
         const reviewerList = querySnapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
+          const data = docSnap.data() as any;
           return {
             id: docSnap.id,
             name: data.name || "Unnamed Reviewer",
@@ -142,13 +156,10 @@ const [uploadProgress, setUploadProgress] = useState(0);
         console.error("Error fetching reviewers:", error);
       }
     };
-
     fetchReviewers();
   }, [db]);
 
-
-
-  // Existing resume subscription 
+  // Subscribe to this resume doc
   useEffect(() => {
     if (!id) {
       setFsResume(null);
@@ -167,32 +178,27 @@ const [uploadProgress, setUploadProgress] = useState(0);
       },
       (err) => {
         console.error("[ResumeViewScreen] failed to subscribe", err);
-        setLoadError(err);
+        setLoadError((err as any)?.message || "Failed to load resume");
         setFsResume(null);
         setLoading(false);
       }
     );
 
     return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-
-  // fallback: find resume from passed props if Firestore result missing
+  // fallback to props if Firestore result missing
   const resumeFromProps = useMemo(() => resumes.find((r) => r.id === id), [id, resumes]);
-
   const resume: Resume | null = fsResume ?? resumeFromProps ?? null;
 
-  // Get names of reviewers who have access
+  // Convenience: set of reviewer IDs who have access
+  const sharedIds = (resume?.sharedWithIds ?? []) as string[];
+
+  // Names of reviewers who have access (derived from directory)
   const sharedReviewerNames = useMemo(() => {
-    const sharedIds = resume?.sharedWithIds ?? [];
-    if (sharedIds.length === 0 || reviewers.length === 0) return [];
-    return reviewers
-      .filter((r) => sharedIds.includes(r.id))
-      .map((r) => r.name);
-  }, [resume?.sharedWithIds, reviewers]);
-
-
+    if (!resume || reviewers.length === 0) return [];
+    return reviewers.filter((r) => sharedIds.includes(r.id)).map((r) => r.name);
+  }, [resume, reviewers, sharedIds]);
 
   const go = (path: string) => navigate(path);
 
@@ -211,91 +217,119 @@ const [uploadProgress, setUploadProgress] = useState(0);
     }
   };
 
-const handleReplaceResume = async () => {
-  if (!newFile) return;
-  if (!resume) return;
+  const handleReplaceResume = async () => {
+    if (!newFile || !resume) return;
 
-  if (newFile.type !== "application/pdf") {
-    alert("Please upload a PDF file.");
-    return;
-  }
-  if (newFile.size > 5 * 1024 * 1024) {
-    alert("File must be less than 5 MB.");
-    return;
-  }
+    if (newFile.type !== "application/pdf") {
+      alert("Please upload a PDF file.");
+      return;
+    }
+    if (newFile.size > 5 * 1024 * 1024) {
+      alert("File must be less than 5 MB.");
+      return;
+    }
 
-  try {
-    setUploading(true);
-    setUploadProgress(0);
+    try {
+      setUploading(true);
+      setUploadProgress(0);
 
-    const storageRef = ref(storage, `resumes/${resume.id}/${newFile.name}`);
-    const uploadTask = await uploadBytes(storageRef, newFile);
-    const newURL = await getDownloadURL(uploadTask.ref);
+      const storageRef = ref(storage, `resumes/${resume.id}/${newFile.name}`);
+      const uploadTask = await uploadBytes(storageRef, newFile);
+      const newURL = await getDownloadURL(uploadTask.ref);
 
-    const resumeRef = fsDoc(db, "resumes", resume.id);
-    const newUploadDate = Timestamp.now();
+      const resumeRef = fsDoc(db, "resumes", resume.id);
+      const newUploadDate = Timestamp.now();
 
-    await updateDoc(resumeRef, {
-      fileName: newFile.name,
-      downloadURL: newURL,
-      uploadDate: newUploadDate,
-      version: (resume.version || 1) + 1,
-    });
+      await updateDoc(resumeRef, {
+        fileName: newFile.name,
+        downloadURL: newURL,
+        uploadDate: newUploadDate,
+        version: (resume.version || 1) + 1,
+      });
 
-    // Update local state instead of reloading
-    setFsResume({
-      ...resume,
-      fileName: newFile.name,
-      downloadURL: newURL,
-      uploadDate: newUploadDate,
-      version: (resume.version || 1) + 1,
-    });
+      // update local immediately
+      setFsResume({
+        ...resume,
+        fileName: newFile.name,
+        downloadURL: newURL,
+        uploadDate: newUploadDate as any,
+        version: (resume.version || 1) + 1,
+      });
 
-    setNewFile(null);
-    alert("Resume replaced successfully!");
-  } catch (error) {
-    console.error("Error replacing resume:", error);
-    alert("There was an error replacing the resume. Please try again.");
-  } finally {
-    setUploading(false);
-  }
-};
+      setNewFile(null);
+      showBanner("Resume replaced successfully.", "success");
+    } catch (error) {
+      console.error("Error replacing resume:", error);
+      showBanner("There was an error replacing the resume.", "error", 6000);
+    } finally {
+      setUploading(false);
+    }
+  };
 
+  // --- Access Management ---
 
+  const toggleSelectToAdd = (id: string) => {
+    setSelectedToAdd((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
-const assignReviewer = async () => {
-  if (!resume || !selectedReviewer) return;
+  const addSelectedReviewers = async () => {
+    if (!resume || selectedToAdd.length === 0) return;
+    try {
+      const resumeRef = fsDoc(db, "resumes", resume.id);
 
-  try {
-    const chosenReviewer = reviewers.find((r) => r.id === selectedReviewer);
-    if (!chosenReviewer) return;
+      // Only add reviewers not already in sharedWithIds
+      const toAdd = selectedToAdd.filter((rid) => !sharedIds.includes(rid));
+      if (toAdd.length === 0) {
+        setSelectedToAdd([]);
+        return;
+      }
 
-    const resumeRef = fsDoc(db, "resumes", resume.id);
+      await updateDoc(resumeRef, {
+        sharedWithIds: arrayUnion(...toAdd),
+      });
 
-    // 🔹 Add this reviewer to sharedWithIds (if not already there)
-    await updateDoc(resumeRef, {
-      sharedWithIds: arrayUnion(chosenReviewer.id),
-    });
+      // local UI update
+      setFsResume({
+        ...resume,
+        sharedWithIds: [...sharedIds, ...toAdd],
+      } as any);
 
-    // 🔹 Optionally update reviewer display name for UI purposes
-    await updateDoc(resumeRef, {
-      reviewerName: chosenReviewer.name,
-    });
+      setSelectedToAdd([]);
+      showBanner(
+        `${toAdd.length} reviewer${toAdd.length === 1 ? "" : "s"} added.`,
+        "success"
+      );
+    } catch (err) {
+      console.error("Error adding reviewers:", err);
+      showBanner("Failed to add reviewers. Please try again.", "error", 6000);
+    }
+  };
 
-    alert(`Added ${chosenReviewer.name} as a reviewer.`);
+  const revokeReviewer = async (reviewerId: string, reviewerName?: string) => {
+    if (!resume) return;
+    try {
+      const resumeRef = fsDoc(db, "resumes", resume.id);
+      await updateDoc(resumeRef, {
+        sharedWithIds: arrayRemove(reviewerId),
+      });
 
-    // Update local UI instantly
-    setFsResume({
-      ...resume,
-      reviewerName: chosenReviewer.name,
-      sharedWithIds: [...(resume.sharedWithIds || []), chosenReviewer.id],
-    });
-  } catch (error) {
-    console.error("Error assigning reviewer:", error);
-    alert("Failed to assign reviewer. Please try again.");
-  }
-};
+      // local UI update
+      setFsResume({
+        ...resume,
+        sharedWithIds: sharedIds.filter((id) => id !== reviewerId),
+      } as any);
 
+      showBanner(
+        `Access revoked for ${reviewerName || "reviewer"}.`,
+        "info"
+      );
+    } catch (err) {
+      console.error("Error revoking reviewer:", err);
+      showBanner("Failed to revoke access. Please try again.", "error", 6000);
+    }
+  };
 
   const handleReplyChange = (commentId: string, text: string) => {
     setReplyInputs((s) => ({ ...s, [commentId]: text }));
@@ -312,7 +346,7 @@ const assignReviewer = async () => {
       });
       setReplyInputs((s) => ({ ...s, [commentId]: "" }));
     } catch {
-      alert("Failed to add reply");
+      showBanner("Failed to add reply.", "error", 6000);
     }
   };
 
@@ -320,8 +354,9 @@ const assignReviewer = async () => {
     if (!resume) return;
     try {
       await toggleCommentResolved(resume.id, commentId, true);
+      showBanner("Comment marked as resolved.", "success");
     } catch {
-      alert("Failed to mark resolved");
+      showBanner("Failed to mark resolved.", "error", 6000);
     }
   };
 
@@ -345,8 +380,13 @@ const assignReviewer = async () => {
     );
   }
 
-  const resolvedComments = resume.comments.filter((c) => c.resolved);
-  const unresolvedComments = resume.comments.filter((c) => !c.resolved);
+  const resolvedComments = (resume.comments ?? []).filter((c) => c.resolved);
+  const unresolvedComments = (resume.comments ?? []).filter((c) => !c.resolved);
+
+  // Filter directory for Add UI: show all reviewers, but visually mark ones who already have access
+  const filteredReviewers = reviewers.filter((r) =>
+    r.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-white">
@@ -385,14 +425,12 @@ const assignReviewer = async () => {
         <Alert className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            {getStatusMessage(resume.status)}
-              {sharedReviewerNames.length > 0 && (
-                <span>
-                  {" "}
-                  Shared with:{" "}
-                  <strong>{sharedReviewerNames.join(", ")}</strong>
-                </span>
-              )}
+            {getStatusMessage(resume.status)}{" "}
+            {sharedReviewerNames.length > 0 && (
+              <span>
+                Shared with: <strong>{sharedReviewerNames.join(", ")}</strong>
+              </span>
+            )}
           </AlertDescription>
         </Alert>
 
@@ -499,7 +537,8 @@ const assignReviewer = async () => {
                     />
                   </div>
                 )}
-                {/* Replace Resume Section (visible to student only) */}
+
+                {/* Replace Resume (student only) */}
                 {user.type === "student" && (
                   <div className="mt-6 border-t pt-4">
                     <h3 className="text-lg font-semibold mb-2">Replace Resume</h3>
@@ -530,7 +569,6 @@ const assignReviewer = async () => {
                         {uploading ? `Uploading... ${uploadProgress}%` : "Replace Resume"}
                       </Button>
                     </div>
-
                   </div>
                 )}
               </CardContent>
@@ -572,60 +610,30 @@ const assignReviewer = async () => {
               </CardContent>
             </Card>
 
-            {/* ✅ Select Reviewer Section */}
-            {user.type === "student" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Select Reviewer</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {reviewers.length > 0 ? (
-                    <select
-                      className="w-full border rounded p-2 text-sm"
-                      value={selectedReviewer}
-                      onChange={(e) => setSelectedReviewer(e.target.value)}
-                    >
-                      <option value="">-- Choose a Reviewer --</option>
-                      {reviewers.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="text-sm text-gray-500">No reviewers available.</p>
-                  )}
-
-                  <Button
-                    className="mt-3 w-full"
-                    onClick={assignReviewer}
-                    disabled={!selectedReviewer}
-                  >
-                    Assign Reviewer
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Comments Section */}
+            {/* Comments */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquare className="w-5 h-5" />
-                  Feedback ({resume.comments.length})
+                  Feedback ({(resume.comments ?? []).length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {resume.comments.length > 0 ? (
+                {(resume.comments ?? []).length > 0 ? (
                   <div className="space-y-4">
                     {unresolvedComments.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm text-red-600 mb-3">Action Required ({unresolvedComments.length})</h4>
-                        {unresolvedComments.map((comment) => (
+                        <h4 className="font-medium text-sm text-red-600 mb-3">
+                          Action Required ({unresolvedComments.length})
+                        </h4>
+                        {unresolvedComments.map((comment: any) => (
                           <div key={comment.id} className="border-l-4 border-red-200 pl-4 mb-4">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <p className="font-medium text-sm flex items-center gap-2"><UserIcon className="w-3 h-3" />{comment.authorName}</p>
+                                <p className="font-medium text-sm flex items-center gap-2">
+                                  <UserIcon className="w-3 h-3" />
+                                  {comment.authorName}
+                                </p>
                                 <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
                               </div>
                               {user.type === "student" && (
@@ -637,7 +645,7 @@ const assignReviewer = async () => {
                             <p className="text-sm mb-3 bg-red-50 p-3 rounded">{comment.text}</p>
 
                             <div className="ml-4 space-y-2 border-l border-gray-200 pl-3">
-                              {comment.replies.map((reply) => (
+                              {(comment.replies ?? []).map((reply: any) => (
                                 <div key={reply.id} className="bg-blue-50 p-2 rounded">
                                   <div className="flex items-center gap-2 mb-1">
                                     <p className="font-medium text-xs">{reply.authorName}</p>
@@ -669,15 +677,23 @@ const assignReviewer = async () => {
 
                     {resolvedComments.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm text-green-600 mb-3">Resolved ({resolvedComments.length})</h4>
-                        {resolvedComments.map((comment) => (
+                        <h4 className="font-medium text-sm text-green-600 mb-3">
+                          Resolved ({resolvedComments.length})
+                        </h4>
+                        {resolvedComments.map((comment: any) => (
                           <div key={comment.id} className="border-l-2 border-green-200 pl-4 mb-4 opacity-75">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <p className="font-medium text-sm flex items-center gap-2"><UserIcon className="w-3 h-3" />{comment.authorName}</p>
+                                <p className="font-medium text-sm flex items-center gap-2">
+                                  <UserIcon className="w-3 h-3" />
+                                  {comment.authorName}
+                                </p>
                                 <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
                               </div>
-                              <Badge variant="secondary" className="text-xs"><CheckCircle className="w-3 h-3 mr-1" />Resolved</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Resolved
+                              </Badge>
                             </div>
                             <p className="text-sm">{comment.text}</p>
                           </div>
@@ -693,6 +709,121 @@ const assignReviewer = async () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Manage Access (student only) */}
+            {user.type === "student" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Manage Access</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Tiny banner for success/error/info */}
+                  {banner && (
+                    <div
+                      className={[
+                        "flex items-start justify-between gap-3 rounded-md p-3 text-sm border",
+                        banner.type === "success" ? "bg-green-50 border-green-200 text-green-800" :
+                          banner.type === "error" ? "bg-red-50 border-red-200 text-red-800" :
+                            "bg-blue-50 border-blue-200 text-blue-800",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-start gap-2">
+                        <InfoIcon className="w-4 h-4 mt-[2px]" />
+                        <span>{banner.message}</span>
+                      </div>
+                      <button
+                        aria-label="Dismiss"
+                        className="opacity-70 hover:opacity-100"
+                        onClick={dismissBanner}
+                      >
+                        <XIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Current Access */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-2">Current reviewers</p>
+                    {sharedIds.length === 0 ? (
+                      <p className="text-sm text-gray-500">No reviewers have access yet.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {reviewers
+                          .filter((r) => sharedIds.includes(r.id))
+                          .map((r) => (
+                            <span
+                              key={r.id}
+                              className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded"
+                            >
+                              {r.name}
+                              <button
+                                aria-label={`Revoke ${r.name}`}
+                                title={`Revoke ${r.name}`}
+                                className="hover:text-blue-900"
+                                onClick={() => {
+                                  // Confirm alert before revoking (disruptive action)
+                                  if (window.confirm(`Remove ${r.name}'s access to this resume?`)) {
+                                    revokeReviewer(r.id, r.name);
+                                  }
+                                }}
+                              >
+                                <XIcon className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Reviewers */}
+                  <div className="border-t pt-3">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Add reviewers</p>
+                    <input
+                      type="text"
+                      placeholder="Search reviewers…"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full border rounded px-3 py-2 text-sm mb-3"
+                    />
+                    <div className="max-h-40 overflow-y-auto space-y-2 border rounded p-2">
+                      {filteredReviewers.length === 0 ? (
+                        <p className="text-sm text-gray-500">No reviewers found.</p>
+                      ) : (
+                        filteredReviewers.map((r) => {
+                          const alreadyHasAccess = sharedIds.includes(r.id);
+                          return (
+                            <label
+                              key={r.id}
+                              className={`flex items-center gap-2 cursor-pointer ${alreadyHasAccess ? "opacity-60" : ""}`}
+                              title={alreadyHasAccess ? "Already has access" : ""}
+                            >
+                              <input
+                                type="checkbox"
+                                disabled={alreadyHasAccess}
+                                checked={selectedToAdd.includes(r.id)}
+                                onChange={() => toggleSelectToAdd(r.id)}
+                              />
+                              <span>{r.name}</span>
+                              {alreadyHasAccess && (
+                                <span className="text-[10px] text-gray-500">(has access)</span>
+                              )}
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                    <Button
+                      className="mt-3 w-full"
+                      onClick={addSelectedReviewers}
+                      disabled={selectedToAdd.length === 0}
+                    >
+                      <PlusIcon className="w-4 h-4 mr-1" />
+                      Add Selected
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Version History */}
             <Card>
