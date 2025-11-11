@@ -6,8 +6,8 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "types": ["jest", "node"],
+    "types": ["jest", "@testing-library/jest-dom", "node"],
     "jsx": "react-jsx"
   },
-  "include": ["vite.config.ts"]
+  "include": ["src", "vite.config.ts", "jest.setup.ts"]
 }
