@@ -50,7 +50,6 @@ export function StudentDashboard({
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-<<<<<<< HEAD
 
   // notification: count unresolved comments across student's resumes
   const [unresolvedCommentsCount, setUnresolvedCommentsCount] = useState(0);
@@ -88,8 +87,6 @@ export function StudentDashboard({
       }
     };
   }, [db, user?.id]);
-=======
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 
   useEffect(() => {
     if (!user || !user.id) {
@@ -102,14 +99,10 @@ export function StudentDashboard({
     setFetchError(null);
 
     try {
-<<<<<<< HEAD
       const q = query(
         collection(db, 'resumes'),
         where('studentId', '==', user.id)
       );
-=======
-      const q = query(collection(db, 'resumes'), where('studentId', '==', user.id));
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 
       const unsub = onSnapshot(
         q,
@@ -137,12 +130,11 @@ export function StudentDashboard({
         },
         (err) => {
           console.error('[StudentDashboard] failed to subscribe to resumes', err);
-          setFetchError(err.message || 'Failed to load resumes');
+          setFetchError((err as any)?.message || 'Failed to load resumes');
           setLoading(false);
         }
       );
 
-<<<<<<< HEAD
       return () => {
         if (typeof unsub === 'function') {
           unsub();
@@ -153,12 +145,6 @@ export function StudentDashboard({
     } catch (err: any) {
       console.error('[StudentDashboard] unexpected error fetching resumes', err);
       setFetchError(err?.message || 'Failed to load resumes');
-=======
-      return () => unsub();
-    } catch (err: any) {
-      console.error('[StudentDashboard] unexpected error fetching resumes', err);
-      setFetchError(err.message || 'Failed to load resumes');
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
       setLoading(false);
     }
   }, [db, user?.id, user?.name]);
@@ -192,12 +178,13 @@ export function StudentDashboard({
     }
   };
 
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
+  };
 
   const handleDelete = async (id: string) => {
     if (!id) return;
@@ -210,20 +197,6 @@ export function StudentDashboard({
     }
   };
 
-<<<<<<< HEAD
-  const handleDelete = async (id: string) => {
-    if (!id) return;
-    if (!window.confirm('Delete this resume? This cannot be undone.')) return;
-    try {
-      await deleteDoc(fsDoc(db, 'resumes', id));
-    } catch (err) {
-      console.error('[StudentDashboard] delete failed', err);
-      alert('Failed to delete. Please try again.');
-    }
-  };
-
-=======
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
   const handleCopy = async (url?: string) => {
     if (!url) return;
     try {
@@ -232,7 +205,6 @@ export function StudentDashboard({
       alert('Could not copy link');
     }
   };
-<<<<<<< HEAD
 
   const handleDownload = (url?: string) => {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
@@ -256,23 +228,6 @@ export function StudentDashboard({
   const reviewedResumes = allResumes.filter((r) =>
     ['reviewed', 'approved'].includes(r.status)
   );
-=======
-
-  const handleDownload = (url?: string) => {
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const handlePrint = (url?: string) => {
-    if (!url) return;
-    const w = window.open(url, '_blank', 'noopener,noreferrer');
-    w?.print?.();
-  };
-
-  const allResumes = fsResumes ?? propResumes ?? [];
-  const yourResumes = allResumes;
-  const submittedResumes = allResumes.filter((r) => r.status === 'in-review');
-  const reviewedResumes = allResumes.filter((r) => r.status === 'reviewed' || r.status === 'approved');
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 
   return (
     <div className="min-h-screen bg-white">
@@ -322,7 +277,6 @@ export function StudentDashboard({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {yourResumes.map((r, idx) => {
               const uniqueKey = `your-${r.id}-${idx}`;
-<<<<<<< HEAD
               const unresolved = getUnresolvedCount(r);
               return (
                 <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
@@ -336,10 +290,6 @@ export function StudentDashboard({
                       </span>
                     </div>
                   )}
-=======
-              return (
-                <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                   <div
                     className="absolute inset-0 z-10 cursor-pointer"
                     onClick={(e) => {
@@ -371,7 +321,6 @@ export function StudentDashboard({
                     <div className="p-4 flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium text-sm truncate">{r.fileName}</p>
-<<<<<<< HEAD
                         <p className="text-xs text-gray-600 mt-1">
                           {formatDate(
                             typeof r.uploadDate === 'string'
@@ -379,9 +328,6 @@ export function StudentDashboard({
                               : r.uploadDate?.toDate?.().toISOString() ?? ''
                           )}
                         </p>
-=======
-                        <p className="text-xs text-gray-600 mt-1">{formatDate(r.uploadDate)}</p>
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                         <Badge className={`mt-2 ${getStatusColor(r.status)}`}>
                           <span className="flex items-center gap-1">
                             {getStatusIcon(r.status)}
@@ -488,7 +434,6 @@ export function StudentDashboard({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {submittedResumes.map((r, idx) => {
                 const uniqueKey = `submitted-${r.id}-${idx}`;
-<<<<<<< HEAD
                 const unresolved = getUnresolvedCount(r);
                 return (
                   <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
@@ -502,10 +447,6 @@ export function StudentDashboard({
                         </span>
                       </div>
                     )}
-=======
-                return (
-                  <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                     <div
                       className="absolute inset-0 z-10 cursor-pointer"
                       onClick={(e) => {
@@ -537,7 +478,6 @@ export function StudentDashboard({
                       <div className="p-4 flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">{r.fileName}</p>
-<<<<<<< HEAD
                           <p className="text-xs text-gray-600 mt-1">
                             Reviewer: {r.reviewerName}
                           </p>
@@ -552,13 +492,6 @@ export function StudentDashboard({
                             <span className="flex items-center gap-1">
                               {getStatusIcon(r.status)}
                               In Review
-=======
-                          <p className="text-xs text-gray-600 mt-1">{formatDate(r.uploadDate)}</p>
-                          <Badge className={`mt-2 ${getStatusColor(r.status)}`}>
-                            <span className="flex items-center gap-1">
-                              {getStatusIcon(r.status)}
-                              {r.status.charAt(0).toUpperCase() + r.status.slice(1).replace('-', ' ')}
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                             </span>
                           </Badge>
                         </div>
@@ -586,7 +519,6 @@ export function StudentDashboard({
                             >
                               <MoreHorizontal className="w-4 h-4" />
                             </button>
-<<<<<<< HEAD
 
                             {openMenuId === uniqueKey && (
                               <div
@@ -625,53 +557,10 @@ export function StudentDashboard({
                                 </button>
                               </div>
                             )}
-=======
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                           </div>
                         </div>
                       </div>
                     </CardContent>
-<<<<<<< HEAD
-=======
-
-                    {openMenuId === uniqueKey && (
-                      <div
-                        className="absolute right-0 top-full mt-1 w-44 rounded border bg-white shadow-lg z-50"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopy(r.downloadURL);
-                            setOpenMenuId(null);
-                          }}
-                        >
-                          <Share2 className="w-4 h-4" /> Copy link
-                        </button>
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload(r.downloadURL);
-                            setOpenMenuId(null);
-                          }}
-                        >
-                          <Download className="w-4 h-4" /> Download
-                        </button>
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrint(r.downloadURL);
-                            setOpenMenuId(null);
-                          }}
-                        >
-                          <Printer className="w-4 h-4" /> Print
-                        </button>
-                      </div>
-                    )}
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                   </Card>
                 );
               })}
@@ -688,7 +577,6 @@ export function StudentDashboard({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {reviewedResumes.map((r, idx) => {
                 const uniqueKey = `reviewed-${r.id}-${idx}`;
-<<<<<<< HEAD
                 const unresolved = getUnresolvedCount(r);
                 return (
                   <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
@@ -702,10 +590,6 @@ export function StudentDashboard({
                         </span>
                       </div>
                     )}
-=======
-                return (
-                  <Card key={uniqueKey} className="relative hover:shadow-lg transition-shadow border border-black rounded-xl overflow-visible">
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                     <div
                       className="absolute inset-0 z-10 cursor-pointer"
                       onClick={(e) => {
@@ -737,7 +621,6 @@ export function StudentDashboard({
                       <div className="p-4 flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">{r.fileName}</p>
-<<<<<<< HEAD
                           <p className="text-xs text-gray-600 mt-1">
                             Reviewed by: {r.reviewerName}
                           </p>
@@ -759,15 +642,6 @@ export function StudentDashboard({
                               {r.comments.length} comment{r.comments.length !== 1 ? 's' : ''}
                             </p>
                           )}
-=======
-                          <p className="text-xs text-gray-600 mt-1">{formatDate(r.uploadDate)}</p>
-                          <Badge className={`mt-2 ${getStatusColor(r.status)}`}>
-                            <span className="flex items-center gap-1">
-                              {getStatusIcon(r.status)}
-                              {r.status.charAt(0).toUpperCase() + r.status.slice(1).replace('-', ' ')}
-                            </span>
-                          </Badge>
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                         </div>
 
                         <div className="relative z-20 flex items-center gap-2 shrink-0 action-zone">
@@ -793,7 +667,6 @@ export function StudentDashboard({
                             >
                               <MoreHorizontal className="w-4 h-4" />
                             </button>
-<<<<<<< HEAD
 
                             {openMenuId === uniqueKey && (
                               <div
@@ -832,52 +705,10 @@ export function StudentDashboard({
                                 </button>
                               </div>
                             )}
-=======
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                           </div>
                         </div>
                       </div>
                     </CardContent>
-<<<<<<< HEAD
-=======
-                    {openMenuId === uniqueKey && (
-                      <div
-                        className="absolute right-0 top-full mt-1 w-44 rounded border bg-white shadow-lg z-50"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopy(r.downloadURL);
-                            setOpenMenuId(null);
-                          }}
-                        >
-                          <Share2 className="w-4 h-4" /> Copy link
-                        </button>
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload(r.downloadURL);
-                            setOpenMenuId(null);
-                          }}
-                        >
-                          <Download className="w-4 h-4" /> Download
-                        </button>
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrint(r.downloadURL);
-                            setOpenMenuId(null);
-                          }}
-                        >
-                          <Printer className="w-4 h-4" /> Print
-                        </button>
-                      </div>
-                    )}
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                   </Card>
                 );
               })}
