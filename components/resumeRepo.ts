@@ -12,6 +12,7 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
+  Timestamp,
 } from 'firebase/firestore';
 import { Resume, Comment, Reply } from '../src/App';
 
@@ -31,23 +32,37 @@ export function subscribeToResume(
         onData(null);
         return;
       }
+
       const data = snap.data() as any;
+
+      // ✅ Normalize Firestore Timestamps into ISO strings
+      const normalized = {
+        ...data,
+        uploadDate:
+          data.uploadDate instanceof Timestamp
+            ? data.uploadDate.toDate().toISOString()
+            : data.uploadDate ?? new Date().toISOString(),
+        comments: Array.isArray(data.comments) ? data.comments : [],
+        sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [],
+      };
+
       const resume: Resume = {
         id: data.id ?? snap.id,
-        fileName: data.fileName ?? 'Untitled',
-        studentId: data.studentId ?? '',
-        studentName: data.studentName ?? '',
-        uploadDate: data.uploadDate ?? new Date().toISOString(),
-        status: data.status ?? 'pending',
-        reviewerId: data.reviewerId ?? undefined,
-        reviewerName: data.reviewerName ?? undefined,
-        comments: Array.isArray(data.comments) ? data.comments : [],
-        version: data.version ?? 1,
-        downloadURL: data.downloadURL,
-        storagePath: data.storagePath,
-        sharedWith: Array.isArray(data.sharedWith) ? data.sharedWith : [], // ✅ add this line
-        ...data,
+        fileName: normalized.fileName ?? 'Untitled',
+        studentId: normalized.studentId ?? '',
+        studentName: normalized.studentName ?? '',
+        uploadDate: normalized.uploadDate,
+        status: normalized.status ?? 'pending',
+        reviewerId: normalized.reviewerId ?? undefined,
+        reviewerName: normalized.reviewerName ?? undefined,
+        comments: normalized.comments,
+        version: normalized.version ?? 1,
+        downloadURL: normalized.downloadURL,
+        storagePath: normalized.storagePath,
+        sharedWith: normalized.sharedWith,
+        ...normalized,
       };
+
       onData(resume);
     },
     (err) => {
