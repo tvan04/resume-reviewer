@@ -1,5 +1,5 @@
-// src/tests/App.test.tsx
-import { screen, render } from "@testing-library/react";
+import { screen, render, waitFor } from "@testing-library/react";
+import { act } from "react";
 import { MemoryRouter } from "react-router-dom";
 import App from "../App";
 
@@ -47,7 +47,7 @@ jest.mock("../../components/RegisterScreen", () => ({
   ),
 }));
 
-test("renders register route and triggers onRegister", () => {
+test("renders register route and triggers onRegister", async () => {
   render(
     <MemoryRouter initialEntries={["/register"]}>
       <App />
@@ -55,8 +55,16 @@ test("renders register route and triggers onRegister", () => {
   );
 
   const registerButton = screen.getByText(/Mock Register/i);
-  registerButton.click(); // triggers handleLogin inside App
-  expect(registerButton).toBeInTheDocument();
+
+  // Wrap the state-changing action in act()
+  await act(async () => {
+    registerButton.click();
+  });
+
+  // Wait for state updates to complete
+  await waitFor(() => {
+    expect(registerButton).toBeInTheDocument();
+  });
 });
 
 jest.mock("../../components/UploadScreen", () => ({
@@ -109,9 +117,6 @@ test("renders student dashboard when logged in as student", () => {
       <App />
     </MemoryRouter>
   );
-
-  // Simulate login
-  // Instead of actual hooks, we can re-render with controlled state using a dummy wrapper or prefilled prop mock
 });
 
 test("renders reviewer dashboard when logged in as reviewer", () => {
@@ -120,6 +125,4 @@ test("renders reviewer dashboard when logged in as reviewer", () => {
       <App />
     </MemoryRouter>
   );
-
-  // assert reviewer version renders
 });

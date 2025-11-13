@@ -20,9 +20,6 @@ import {
   Timestamp,
 } from "firebase/firestore";
 
-// ------------------------
-// 🔧 Mock Firestore methods
-// ------------------------
 jest.mock("firebase/firestore", () => {
   class MockTimestamp {
     toDate() {
@@ -42,22 +39,14 @@ jest.mock("firebase/firestore", () => {
   };
 });
 
-
-
 const mockGetDoc = getDoc as jest.Mock;
 const mockUpdateDoc = updateDoc as jest.Mock;
 const mockOnSnapshot = onSnapshot as jest.Mock;
 
-// ------------------------
-// Mock crypto for UUIDs
-// ------------------------
 global.crypto = {
   randomUUID: jest.fn(() => "uuid-1234"),
 } as any;
 
-// ------------------------
-// Common mock data
-// ------------------------
 const mockComment = {
   id: "c1",
   text: "Old comment",
@@ -74,17 +63,24 @@ const mockSnap = (data: any) => ({
   data: () => data,
 });
 
-// ------------------------
-// Tests
-// ------------------------
 describe("resumeRepo Firestore logic", () => {
+  const originalConsoleError = console.error;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    console.error = jest.fn((message, ...args) => {
+      if (message === '[subscribeToResume] error') {
+        console.log('Firestore error test (expected)');
+      } else {
+        originalConsoleError(message, ...args);
+      }
+    });
   });
 
-  // ------------------------
-  // SUBSCRIBE TO RESUME
-  // ------------------------
+  afterEach(() => {
+    console.error = originalConsoleError;
+  });
+
   it("calls onData with resume when snapshot exists", () => {
     const mockData = { fileName: "resume.pdf", uploadDate: new (Timestamp as any)() };
     const mockCb = jest.fn();
@@ -121,9 +117,6 @@ describe("resumeRepo Firestore logic", () => {
     expect(mockErr).toHaveBeenCalledWith("Firestore failed");
   });
 
-  // ------------------------
-  // COMMENT HELPERS
-  // ------------------------
   it("adds a comment to resume", async () => {
     mockGetDoc.mockResolvedValue(mockSnap({ comments: [] }));
     await addCommentToResume("resume1", {
@@ -175,9 +168,6 @@ describe("resumeRepo Firestore logic", () => {
     });
   });
 
-  // ------------------------
-  // RESUME STATUS + SHARING
-  // ------------------------
   it("updates resume status", async () => {
     await updateResumeStatus("resume1", "reviewed");
     expect(mockUpdateDoc).toHaveBeenCalledWith(expect.anything(), { status: "reviewed" });
