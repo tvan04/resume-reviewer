@@ -1,4 +1,3 @@
-import React from "react";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ReviewerDashboard } from "../../components/ReviewerDashboard";
@@ -203,4 +202,69 @@ describe("ReviewerDashboard", () => {
       expect(screen.getByText(/Error: Firestore connection failed/i)).toBeInTheDocument();
     });
   });
+
+  it("handles missing user ID gracefully", () => {
+    const userWithoutId = { ...mockUser, id: undefined as any };
+
+    mockOnSnapshot.mockImplementation(() => jest.fn());
+
+    render(
+      <MemoryRouter>
+        <ReviewerDashboard user={userWithoutId} resumes={[]} onLogout={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    // Should not crash — verify that something basic renders
+    expect(screen.getByText(/Loading resumes/i)).toBeInTheDocument();
+  });
+
+
+  it("cleans up subscription object correctly", async () => {
+    const unsubscribeMock = jest.fn();
+    mockOnSnapshot.mockImplementation((_query, onNext) => {
+      onNext(mockSnapshot);
+      return { unsubscribe: unsubscribeMock };
+    });
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <ReviewerDashboard user={mockUser} resumes={[]} onLogout={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    unmount();
+    expect(unsubscribeMock).toHaveBeenCalled();
+  });
+
+
+  it("shows awaiting review notification when pending resumes exist", async () => {
+    const snapshotWithPending = {
+      docs: mockResumes
+        .filter((r) => r.status === "pending" || r.status === "in-review")
+        .map((r) => ({ id: r.id, data: () => r })),
+    };
+
+    mockOnSnapshot
+      // First useEffect (awaitingReviewCount)
+      .mockImplementationOnce((_query, onNext) => {
+        onNext(snapshotWithPending);
+        return jest.fn();
+      })
+      // Second useEffect (resumes)
+      .mockImplementationOnce((_query, onNext) => {
+        onNext(snapshotWithPending);
+        return jest.fn();
+      });
+
+    render(
+      <MemoryRouter>
+        <ReviewerDashboard user={mockUser} resumes={[]} onLogout={jest.fn()} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/New submissions:/i)).toBeInTheDocument();
+    });
+  });
+
 });
