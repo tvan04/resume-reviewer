@@ -101,10 +101,9 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
   // ---------------- File Handling (with Firebase) ----------------
   const handleFileSelect = (files: FileList | null) => {
-  if (!files) return;
-  const newFiles: UploadFile[] = [];
+    if (!files) return;
+    const newFiles: UploadFile[] = [];
 
-<<<<<<< HEAD
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const error = validateFile(file);
@@ -118,21 +117,6 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
     setUploadFiles(newFiles);
   };
-=======
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const error = validateFile(file);
-    newFiles.push({
-      file,
-      progress: 0,
-      status: error ? "error" : "success", // mark as "success" pre-upload-ready
-      error,
-    });
-  }
-
-  setUploadFiles(newFiles);
-};
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
 
   const startUpload = async (validFiles: UploadFile[]) => {
     if (!user) {
@@ -366,8 +350,8 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
               {/* Drag and Drop */}
               <div
                 className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${isDragOver
-                    ? "border-blue-400 bg-blue-50"
-                    : "border-[rgba(8,133,134,0.3)] bg-[rgba(208,252,253,0.05)]"
+                  ? "border-blue-400 bg-blue-50"
+                  : "border-[rgba(8,133,134,0.3)] bg-[rgba(208,252,253,0.05)]"
                   }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -492,25 +476,17 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
               {/* Upload Button */}
               <div className="mt-8 text-center">
                 <Button
-<<<<<<< HEAD
                   className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${uploadFiles.length > 0 && !isUploading
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "bg-neutral-700 text-white"
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-neutral-700 text-white"
                     }`}
-=======
-                  className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${
-                    uploadFiles.length > 0 && !isUploading
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "bg-neutral-700 text-white"
-                  }`}
->>>>>>> 0045a990a1a81a15a51597a9ef56fb3c92bfed7c
                   disabled={isUploading}
                   onClick={() => {
                     if (uploadFiles.length === 0) {
                       document.getElementById("file-input")?.click(); // acts as "Browse"
                     } else {
                       const valid = uploadFiles.filter((f) => !f.error);
-                      startUpload(valid); // 👈 manually trigger upload now
+                      startUpload(valid);
                     }
                   }}
                 >
