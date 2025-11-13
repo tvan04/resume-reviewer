@@ -1,15 +1,8 @@
-// Contributors:
-//  Luke Arvey - 2 Hours
-//  Ridley Wills - 3 Hours
-//  Tristan Van - 5 Hours
-
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Routes,
   Route,
   Navigate,
-  useNavigate,
-  useParams,
 } from "react-router-dom";
 import { StudentDashboard } from "../components/StudentDashboard";
 import { ReviewerDashboard } from "../components/ReviewerDashboard";
@@ -215,7 +208,6 @@ export default function App() {
 /** Helper wrapper for /review/:id */
 function ReviewWrapper({
   currentUser,
-  resumes,
   onAddComment,
   onStatusUpdate,
 }: {
@@ -227,8 +219,6 @@ function ReviewWrapper({
   ) => void;
   onStatusUpdate: (id: string, status: Resume["status"]) => void;
 }) {
-  const { id } = useParams();
-  const navigate = useNavigate();
   if (!currentUser) return <Navigate to="/login" replace />;
 
   return (
@@ -248,8 +238,6 @@ function ResumeViewWrapper({
   currentUser: User | null;
   resumes: Resume[];
 }) {
-  const { id } = useParams();
-  const navigate = useNavigate();
   if (!currentUser) return <Navigate to="/login" replace />;
 
   return <ResumeViewScreen user={currentUser} resumes={resumes} />;

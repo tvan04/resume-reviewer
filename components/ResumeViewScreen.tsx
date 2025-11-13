@@ -1,8 +1,3 @@
-// Contributors:
-//  Luke Arvey - 5 Hours
-//  Ridley Wills - 5 Hours
-//  Tristan Van - 5 Hours
-
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { NavigationBar } from "./Navigation";
@@ -31,7 +26,7 @@ import { User, Resume } from "../src/App";
 import app, { storage } from "../src/firebaseConfig";
 import { getFirestore, doc as fsDoc, deleteDoc } from "firebase/firestore";
 import { subscribeToResume, addReplyToComment, toggleCommentResolved } from "./resumeRepo";
-import { collection, getDocs, query, where, updateDoc, onSnapshot, doc, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, where, updateDoc, Timestamp } from "firebase/firestore";
 import { arrayUnion, arrayRemove } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
