@@ -92,6 +92,7 @@ const mockSnapshot = {
 describe("ReviewerDashboard", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {}); // silence Firestore errors
   });
 
   it("renders loading state initially", () => {
@@ -178,8 +179,10 @@ describe("ReviewerDashboard", () => {
     await waitFor(() => {
       expect(screen.getByText(/resume_pending.pdf/i)).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByText(/resume_pending.pdf/i));
+    const card = screen.getByText(/resume_pending.pdf/i).closest('.relative');
+    const overlay = card?.querySelector('.absolute.inset-0');
+    if (!overlay) throw new Error("Clickable overlay not found");
+    fireEvent.click(overlay);
     expect(mockNavigate).toHaveBeenCalledWith("/review/1");
   });
 

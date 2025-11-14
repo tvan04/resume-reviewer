@@ -1,8 +1,3 @@
-// Contributors:
-//  Luke Arvey - 1 Hour
-//  Ridley Wills - 1 Hour
-//  Tristan Van - 3 Hours
-
 import { initializeApp } from "firebase/app";
 import { getStorage } from "firebase/storage";
 // TODO: Add SDKs for Firebase products that you want to use

@@ -1,8 +1,3 @@
-// Contributors:
-//  Luke Arvey - 3 Hours
-//  Ridley Wills - 0 Hours
-//  Tristan Van - 0 Hours
-
 import app from '../src/firebaseConfig';
 import {
   getFirestore,

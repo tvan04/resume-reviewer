@@ -1,8 +1,3 @@
-// Contributors:
-//  Luke Arvey - 0 Hours
-//  Ridley Wills - 1 Hour
-//  Tristan Van - 3 Hours
-
 import React, { useState } from 'react'
 
 const ERROR_IMG_SRC =

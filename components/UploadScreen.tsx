@@ -1,8 +1,3 @@
-// Contributors:
-//  Luke Arvey - 3 Hours
-//  Ridley Wills - 1 Hours
-//  Tristan Van - 4 Hours
-
 import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { NavigationBar } from "./Navigation";
@@ -110,17 +105,12 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
       newFiles.push({
         file,
         progress: 0,
-        status: error ? "error" : "uploading",
+        status: error ? "error" : "success", // mark as "success" pre-upload-ready
         error,
       });
     }
 
     setUploadFiles(newFiles);
-
-    const valid = newFiles.filter((f) => f.status === "uploading");
-    if (valid.length > 0) {
-      startUpload(valid);
-    }
   };
 
   const startUpload = async (validFiles: UploadFile[]) => {
@@ -354,11 +344,10 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
 
               {/* Drag and Drop */}
               <div
-                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
-                  isDragOver
-                    ? "border-blue-400 bg-blue-50"
-                    : "border-[rgba(8,133,134,0.3)] bg-[rgba(208,252,253,0.05)]"
-                }`}
+                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${isDragOver
+                  ? "border-blue-400 bg-blue-50"
+                  : "border-[rgba(8,133,134,0.3)] bg-[rgba(208,252,253,0.05)]"
+                  }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -482,11 +471,21 @@ export function UploadScreen({ user, onUpload }: UploadScreenProps) {
               {/* Upload Button */}
               <div className="mt-8 text-center">
                 <Button
-                  className="bg-neutral-700 text-white px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md"
-                  disabled={isUploading || uploadFiles.length === 0}
-                  onClick={() => document.getElementById("file-input")?.click()}
+                  className={`px-8 py-3 text-[14px] font-bold uppercase w-full max-w-md transition-colors ${uploadFiles.length > 0 && !isUploading
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-neutral-700 text-white"
+                    }`}
+                  disabled={isUploading}
+                  onClick={() => {
+                    if (uploadFiles.length === 0) {
+                      document.getElementById("file-input")?.click(); // acts as "Browse"
+                    } else {
+                      const valid = uploadFiles.filter((f) => !f.error);
+                      startUpload(valid);
+                    }
+                  }}
                 >
-                  Upload Files
+                  {uploadFiles.length === 0 ? "Select File(s)" : "Upload Files"}
                 </Button>
               </div>
             </CardContent>

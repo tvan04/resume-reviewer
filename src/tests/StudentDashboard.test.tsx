@@ -1,16 +1,15 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { StudentDashboard } from "../../components/StudentDashboard";
 import { User, Resume, Comment, UserType } from "../App";
 import * as firestore from "firebase/firestore";
 
-// -------------------- MOCKS --------------------
 jest.mock("firebase/firestore", () => ({
   getFirestore: jest.fn(),
   collection: jest.fn(),
   query: jest.fn(),
   where: jest.fn(),
-  onSnapshot: jest.fn(() => () => {}), // unsub mock
+  onSnapshot: jest.fn(() => () => { }),
 }));
 
 jest.mock("../firebaseConfig", () => ({}));
@@ -19,7 +18,6 @@ jest.mock("../../components/Navigation", () => ({
   NavigationBar: ({ user }: any) => <div>Navigation for {user.name}</div>,
 }));
 
-// -------------------- HELPERS --------------------
 const makeComment = (overrides: Partial<Comment> = {}): Comment => ({
   id: "c1",
   text: "Comment",
@@ -31,7 +29,6 @@ const makeComment = (overrides: Partial<Comment> = {}): Comment => ({
   ...overrides,
 });
 
-// -------------------- MOCK DATA --------------------
 const mockUser: User = {
   id: "123",
   name: "Test Student",
@@ -53,7 +50,6 @@ const baseResume: Resume = {
   storagePath: "resumes/1.pdf",
 };
 
-// Helper to generate typed resumes
 const makeResumes = (
   statuses: Array<"pending" | "in-review" | "reviewed" | "approved">
 ): Resume[] =>
@@ -65,36 +61,38 @@ const makeResumes = (
     comments: status === "reviewed" ? [makeComment()] : [],
   }));
 
-  const mockNavigate = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => ({
   ...jest.requireActual("react-router-dom"),
   useNavigate: () => mockNavigate,
 }));
 
-
-// -------------------- TESTS --------------------
 describe("StudentDashboard Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("renders NavigationBar and welcome message", () => {
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[baseResume]} />
-      </MemoryRouter>
-    );
+  it("renders NavigationBar and welcome message", async () => {
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[baseResume]} />
+        </MemoryRouter>
+      );
+    });
 
     expect(screen.getByText(/Navigation for Test Student/i)).toBeInTheDocument();
     expect(screen.getByText(/Welcome, Test Student/i)).toBeInTheDocument();
   });
 
-  it("renders the Upload New card", () => {
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[baseResume]} />
-      </MemoryRouter>
-    );
+  it("renders the Upload New card", async () => {
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[baseResume]} />
+        </MemoryRouter>
+      );
+    });
     expect(screen.getByText(/Upload New/i)).toBeInTheDocument();
     expect(screen.getByText(/Add New Resume/i)).toBeInTheDocument();
   });
@@ -102,7 +100,6 @@ describe("StudentDashboard Component", () => {
   it("shows notification banner when unresolved comments exist (from Firestore mock)", async () => {
     const mockUnsub = jest.fn();
     jest.spyOn(firestore, "onSnapshot").mockImplementationOnce((q, cb: any) => {
-      // simulate 2 unresolved comments
       q;
       cb({
         docs: [
@@ -116,11 +113,13 @@ describe("StudentDashboard Component", () => {
       return mockUnsub;
     });
 
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[]} />
-      </MemoryRouter>
-    );
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[]} />
+        </MemoryRouter>
+      );
+    });
 
     await waitFor(() =>
       expect(
@@ -129,23 +128,26 @@ describe("StudentDashboard Component", () => {
     );
   });
 
-
-  it("hides notification banner when no unresolved comments", () => {
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[baseResume]} />
-      </MemoryRouter>
-    );
+  it("hides notification banner when no unresolved comments", async () => {
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[baseResume]} />
+        </MemoryRouter>
+      );
+    });
     expect(screen.queryByText(/unresolved comment/i)).not.toBeInTheDocument();
   });
 
-  it("renders pending, in-review, reviewed, and approved statuses", () => {
+  it("renders pending, in-review, reviewed, and approved statuses", async () => {
     const resumes = makeResumes(["pending", "in-review", "reviewed", "approved"]);
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={resumes} />
-      </MemoryRouter>
-    );
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={resumes} />
+        </MemoryRouter>
+      );
+    });
 
     expect(screen.getByText(/pending-resume/i)).toBeInTheDocument();
     expect(screen.getByText(/in-review-resume/i)).toBeInTheDocument();
@@ -153,30 +155,33 @@ describe("StudentDashboard Component", () => {
     expect(screen.getByText(/approved-resume/i)).toBeInTheDocument();
   });
 
-  it("caps unresolved comment badge at 9+", () => {
+  it("caps unresolved comment badge at 9+", async () => {
     const resumeWithManyComments: Resume = {
       ...baseResume,
       comments: Array(12).fill(makeComment()),
     };
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[resumeWithManyComments]} />
-      </MemoryRouter>
-    );
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[resumeWithManyComments]} />
+        </MemoryRouter>
+      );
+    });
     expect(screen.getByText("9+")).toBeInTheDocument();
   });
 
-  it("shows loading state when Firestore data not yet loaded", () => {
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[]} />
-      </MemoryRouter>
-    );
+  it("shows loading state when Firestore data not yet loaded", async () => {
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[]} />
+        </MemoryRouter>
+      );
+    });
     expect(screen.getByText(/Loading your resumes/i)).toBeInTheDocument();
   });
 
   it("handles Firestore snapshot error gracefully", async () => {
-    // Correctly mock onSnapshot to call error callback
     jest.spyOn(firestore, "onSnapshot").mockImplementationOnce((_q, observer: any) => {
       if (observer?.error) {
         observer.error(new Error("Firestore failed"));
@@ -184,13 +189,14 @@ describe("StudentDashboard Component", () => {
       return jest.fn();
     });
 
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[]} />
-      </MemoryRouter>
-    );
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[]} />
+        </MemoryRouter>
+      );
+    });
 
-    // Wait for any error-related text (handles 'error', 'failed', or 'problem')
     await waitFor(() =>
       expect(
         screen.getByText(/Loading your resumes/i)
@@ -198,81 +204,100 @@ describe("StudentDashboard Component", () => {
     );
   });
 
-
-
-
-  it("renders correctly when user is missing id (simulating undefined user branch)", () => {
+  it("renders correctly when user is missing id (simulating undefined user branch)", async () => {
     const anonUser: User = {
       id: "",
       name: "",
       email: "",
       type: "student" as UserType,
     };
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={anonUser} resumes={[]} />
-      </MemoryRouter>
-    );
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={anonUser} resumes={[]} />
+        </MemoryRouter>
+      );
+    });
     expect(screen.getByText(/Welcome,/i)).toBeInTheDocument();
   });
 
-
-
-  it("navigates when clicking 'Build Resume from Template' button", () => {
-    const mockNavigate = jest.fn();
-    jest.spyOn(require("react-router-dom"), "useNavigate").mockReturnValue(mockNavigate);
-
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[baseResume]} />
-      </MemoryRouter>
-    );
+  it("navigates when clicking 'Build Resume from Template' button", async () => {
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[baseResume]} />
+        </MemoryRouter>
+      );
+    });
 
     fireEvent.click(screen.getByText(/Build Resume from Template/i));
     expect(mockNavigate).toHaveBeenCalledWith("/upload");
   });
 
-  it("navigates when clicking a resume card", () => {
-    const mockNavigate = jest.fn();
-    jest.spyOn(require("react-router-dom"), "useNavigate").mockReturnValue(mockNavigate);
+  it("navigates when clicking a resume card", async () => {
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[baseResume]} />
+        </MemoryRouter>
+      );
+    });
 
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[baseResume]} />
-      </MemoryRouter>
-    );
+    await waitFor(() => {
+      expect(screen.getByText(/resume.pdf/i)).toBeInTheDocument();
+    });
 
-    fireEvent.click(screen.getByText(/resume.pdf/i));
-    expect(mockNavigate).toHaveBeenCalled();
+    const fileNameElement = screen.getByText(/resume.pdf/i);
+    const cardContent = fileNameElement.closest('[class*="CardContent"]') || fileNameElement.closest('.p-0');
+    expect(cardContent).toBeInTheDocument();
+
+    const card = cardContent?.parentElement;
+    const clickableOverlay = card?.querySelector('.absolute.inset-0.z-10.cursor-pointer');
+
+    if (clickableOverlay) {
+      await act(async () => {
+        fireEvent.click(clickableOverlay);
+      });
+      expect(mockNavigate).toHaveBeenCalledWith("/resume/1");
+    } else {
+      await act(async () => {
+        fireEvent.click(fileNameElement);
+      });
+      expect(mockNavigate).toHaveBeenCalled();
+    }
   });
 
-  it("handles reviewed resumes with comments", () => {
+  it("handles reviewed resumes with comments", async () => {
     const reviewedResume: Resume = {
       ...baseResume,
       status: "reviewed",
       reviewerName: "Reviewer A",
       comments: [makeComment({ text: "Needs work" })],
     };
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[reviewedResume]} />
-      </MemoryRouter>
-    );
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[reviewedResume]} />
+        </MemoryRouter>
+      );
+    });
     expect(screen.getByText(/Reviewed by: Reviewer A/i)).toBeInTheDocument();
     expect(screen.getByText(/1 comment/i)).toBeInTheDocument();
   });
 
-  it("handles approved resume with correct badge", () => {
+  it("handles approved resume with correct badge", async () => {
     const approvedResume: Resume = {
       ...baseResume,
       status: "approved",
       reviewerName: "Reviewer B",
     };
-    render(
-      <MemoryRouter>
-        <StudentDashboard user={mockUser} resumes={[approvedResume]} />
-      </MemoryRouter>
-    );
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <StudentDashboard user={mockUser} resumes={[approvedResume]} />
+        </MemoryRouter>
+      );
+    });
     expect(screen.getByText(/Approved/i)).toBeInTheDocument();
   });
 });
