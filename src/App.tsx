@@ -15,6 +15,7 @@ import { RegisterScreen } from "../components/RegisterScreen";
 import { Timestamp } from "firebase/firestore";
 import "./App.css";
 
+
 export type UserType = "student" | "reviewer" | null;
 
 export interface User {
@@ -54,6 +55,10 @@ export interface Comment {
   createdAt: string;
   resolved: boolean;
   replies: Reply[];
+  
+  // inline comment fields (optional)
+  x?: number;
+  y?: number;
 }
 
 export interface Reply {
