@@ -513,14 +513,14 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
               </CardHeader>
               <CardContent>
                 {resume.downloadURL ? (
-                  <div className="relative bg-gray-100 min-h-[800px] rounded-lg overflow-hidden">
+                  <div className="relative bg-gray-100 rounded-lg max-h-[800px] overflow-auto">
 
                     {/* PDF Viewer */}
                     <object
                       data={resume.downloadURL}
                       type="application/pdf"
                       width="100%"
-                      height="800"
+                      height="1200px"
                       className="pointer-events-none"
                       style={{ zIndex: 1, position: "relative" }}
                     />
