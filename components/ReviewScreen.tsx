@@ -235,7 +235,7 @@ export function ReviewScreen({
 
           <div className="flex items-center gap-4">
             <Badge className={getStatusColor(selectedStatus)}>
-              {selectedStatus.replace('-', ' ')}
+              {selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1).replace('-', ' ')}
             </Badge>
 
             <Select value={selectedStatus} onValueChange={handleStatusChange}>
@@ -529,16 +529,24 @@ export function ReviewScreen({
             <Card>
               <CardHeader><CardTitle>Resume Details</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm"><strong>File Name: </strong>{resume.fileName}</p>
-                <p className="text-sm"><strong>Student: </strong>{resume.studentName}</p>
-                <p className="text-sm"><strong>Uploaded: </strong>
-                  {formatDate(
-                    typeof resume.uploadDate === 'string'
+                <div>
+                  <p className="text-sm font-medium text-gray-600">File Name</p>
+                  <p className="text-sm">{resume.fileName}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Student</p>
+                  <p className="text-sm">{resume.studentName}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Uploaded</p>
+                  <p className="text-sm">{formatDate(typeof resume.uploadDate === 'string'
                       ? resume.uploadDate
-                      : resume.uploadDate?.toDate?.().toISOString() ?? ""
-                  )}
-                </p>
-                <p className="text-sm"><strong>Version:</strong> v{resume.version}</p>
+                      : resume.uploadDate?.toDate?.().toISOString() ?? "")}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Version</p>
+                  <p className="text-sm">v{resume.version}</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -584,70 +592,86 @@ export function ReviewScreen({
                   </p>
                 ) : (
                   <div className="space-y-6">
-                    {resume.comments.map((c) => (
-                      <div key={c.id} className="pl-4 border-l-2 border-blue-200 relative">
-                        <div className="flex justify-between items-start mb-2">
+                  {resume.comments.map((c) => (
+                    <div key={c.id} className="pl-4 border-l-2 border-blue-200 relative">
+
+                      {/* Header row */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                          
+                          {/* ⭐ PIN MOVED TO TOP (indicator next to name) */}
+                          {typeof c.x === "number" && typeof c.y === "number" && (
+                            <MapPin className="w-4 h-4 text-red-500" />
+                          )}
+
                           <div>
                             <p className="font-medium">{c.authorName}</p>
-                            <p className="text-xs text-gray-500">
-                              {formatDate(
-                                typeof resume.uploadDate === "string"
-                                  ? resume.uploadDate
-                                  : resume.uploadDate?.toDate?.().toISOString() ?? ""
-                              )}
-                            </p>
+                            <p className="text-xs text-gray-500">{formatDate(c.createdAt)}</p>
                           </div>
-
-                          {c.authorId === user.id && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingId(c.id);
-                                  setEditText(c.text);
-                                }}
-                              >
-                                Edit
-                              </Button>
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeComment(c.id)}
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          )}
                         </div>
 
-                        {editingId === c.id ? (
-                          <div className="space-y-2">
-                            <Textarea
-                              rows={3}
-                              value={editText}
-                              onChange={(e) => setEditText(e.target.value)}
-                            />
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={saveEdit}>Save</Button>
-                              <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
-                            </div>
+                        {c.authorId === user.id && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingId(c.id);
+                                setEditText(c.text);
+                              }}
+                            >
+                              Edit
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeComment(c.id)}
+                            >
+                              Delete
+                            </Button>
                           </div>
-                        ) : (
-                          <p className="text-sm">{c.text}</p>
                         )}
-
-                        {/* Pin icon if comment is a pin, bottom right */}
-                        {typeof c.x === 'number' && typeof c.y === 'number' && (
-                          <MapPin
-                            className="w-4 h-4 text-red-600 absolute bottom-2 right-2"
-                          />
-                        )}
-
-                        <Separator className="mt-4" />
                       </div>
-                    ))}
+
+                      {/* Comment text */}
+                      {editingId === c.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            rows={3}
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={saveEdit}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm">{c.text}</p>
+                      )}
+
+                      {/* Replies */}
+                      {(c.replies ?? []).length > 0 && (
+                        <div className="ml-4 mt-2 space-y-2 border-l border-gray-200 pl-3">
+                          {c.replies.map((reply) => (
+                            <div key={reply.id} className="bg-blue-50 p-2 rounded">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-xs">{reply.authorName}</p>
+                                <p className="text-xs text-gray-500">{formatDate(reply.createdAt)}</p>
+                              </div>
+                              <p className="text-sm">{reply.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <Separator className="mt-4" />
+                    </div>
+                  ))}
+
                   </div>
                 )}
               </CardContent>
