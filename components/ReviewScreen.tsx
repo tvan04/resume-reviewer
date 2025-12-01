@@ -191,7 +191,6 @@ export function ReviewScreen({
       <NavigationBar user={user} onLogout={() => navigate("/login")} />
 
       <div className="px-[79px] pt-[20px] pb-16">
-
         {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
@@ -250,10 +249,10 @@ export function ReviewScreen({
                   }}
                 >
                   <MapPin className="w-4 h-4" />
-                  {addPinMode ? "Click PDF to place pin..." : "Add Pin"}
+                  {addPinMode ? "Click PDF to place pin or click here to cancel..." : "Add Pin"}
                 </Button>
 
-                
+
                 <div className="flex gap-2">
                   <a href={resume.downloadURL} target="_blank" rel="noreferrer">
                     <Button variant="outline" size="sm">
@@ -276,7 +275,7 @@ export function ReviewScreen({
 
               <CardContent>
                 <div className="relative bg-gray-100 rounded-lg min-h-[800px] overflow-auto">
-                  
+
 
                   {/* PDF Viewer */}
                   <object
@@ -349,6 +348,18 @@ export function ReviewScreen({
                       >
                         ✕
                       </button>
+
+                      {/* Reviewer name and comment time */}
+                      {(() => {
+                        const pinComment = resume.comments.find(c => c.id === activePin.id);
+                        if (!pinComment) return null;
+                        return (
+                          <div className="mb-2">
+                            <div className="text-xs text-gray-700 font-medium">{pinComment.authorName}</div>
+                            <div className="text-xs text-gray-500">{formatDate(pinComment.createdAt)}</div>
+                          </div>
+                        );
+                      })()}
 
                       {!editingPin && (
                         <>
@@ -535,7 +546,7 @@ export function ReviewScreen({
                 ) : (
                   <div className="space-y-6">
                     {resume.comments.map((c) => (
-                      <div key={c.id} className="pl-4 border-l-2 border-blue-200">
+                      <div key={c.id} className="pl-4 border-l-2 border-blue-200 relative">
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <p className="font-medium">{c.authorName}</p>
@@ -586,6 +597,13 @@ export function ReviewScreen({
                           </div>
                         ) : (
                           <p className="text-sm">{c.text}</p>
+                        )}
+
+                        {/* Pin icon if comment is a pin, bottom right */}
+                        {typeof c.x === 'number' && typeof c.y === 'number' && (
+                          <MapPin
+                            className="w-4 h-4 text-red-600 absolute bottom-2 right-2"
+                          />
                         )}
 
                         <Separator className="mt-4" />
