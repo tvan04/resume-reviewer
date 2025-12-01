@@ -78,9 +78,17 @@ describe("ReviewScreen", () => {
     jest.clearAllMocks();
   });
 
+  beforeAll(() => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    (console.error as jest.Mock).mockRestore();
+  });
+
   it("renders loading state initially", () => {
     mockUseParams.mockReturnValue({ id: "resume123" });
-    mockSubscribeToResume.mockReturnValue(() => {});
+    mockSubscribeToResume.mockReturnValue(() => { });
     render(
       <MemoryRouter>
         <ReviewScreen user={mockUser} onAddComment={jest.fn()} onStatusUpdate={jest.fn()} />
@@ -137,9 +145,9 @@ describe("ReviewScreen", () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => screen.getByPlaceholderText(/Provide constructive feedback/i));
+    await waitFor(() => screen.getByPlaceholderText(/Give feedback here/i));
 
-    fireEvent.change(screen.getByPlaceholderText(/Provide constructive feedback/i), {
+    fireEvent.change(screen.getByPlaceholderText(/Give feedback here/i), {
       target: { value: "Great job!" },
     });
     fireEvent.click(screen.getByText(/Add Comment/i));
@@ -258,9 +266,9 @@ describe("ReviewScreen", () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => screen.getByPlaceholderText(/Provide constructive feedback/i));
+    await waitFor(() => screen.getByPlaceholderText(/Give feedback here/i));
 
-    fireEvent.change(screen.getByPlaceholderText(/Provide constructive feedback/i), {
+    fireEvent.change(screen.getByPlaceholderText(/Give feedback here/i), {
       target: { value: "Bad data" },
     });
     fireEvent.click(screen.getByText(/Add Comment/i));

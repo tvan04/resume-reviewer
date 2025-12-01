@@ -110,28 +110,47 @@ export function ReviewScreen({
   const handleAddComment = async () => {
     if (!resume || !newComment.trim()) return;
 
-    await addCommentToResume(resume.id, {
-      text: newComment.trim(),
-      authorId: user.id,
-      authorName: user.name,
-      resolved: false,
-    });
+    try {
+      await addCommentToResume(resume.id, {
+        text: newComment.trim(),
+        authorId: user.id,
+        authorName: user.name,
+        resolved: false,
+      });
 
-    setNewComment('');
+      setNewComment('');
+    } catch (error) {
+      console.error("Add comment failed", error);
+      window.alert("Failed to add comment");
+    }
   };
 
   const handleStatusChange = async (status: Resume['status']) => {
     if (!resume) return;
+
+    const previousStatus = selectedStatus;
     setSelectedStatus(status);
-    await updateResumeStatus(resume.id, status);
+
+    try {
+      await updateResumeStatus(resume.id, status);
+    } catch (error) {
+      console.error("Status failure", error);
+      setSelectedStatus(previousStatus);
+      window.alert("Failed to update status");
+    }
   };
 
   const saveEdit = async () => {
     if (!resume || !editingId) return;
 
-    await editCommentInResume(resume.id, editingId, editText.trim());
-    setEditingId(null);
-    setEditText('');
+    try {
+      await editCommentInResume(resume.id, editingId, editText.trim());
+      setEditingId(null);
+      setEditText('');
+    } catch (error) {
+      console.error("Edit failed", error);
+      window.alert("Failed to edit comment");
+    }
   };
 
   const removeComment = async (commentId: string) => {
@@ -139,7 +158,12 @@ export function ReviewScreen({
 
     if (!confirm("Delete this comment?")) return;
 
-    await deleteCommentFromResume(resume.id, commentId);
+    try {
+      await deleteCommentFromResume(resume.id, commentId);
+    } catch (error) {
+      console.error("Delete failed", error);
+      window.alert("Failed to delete comment");
+    }
   };
 
   const formatDate = (dateString: string) =>
@@ -178,7 +202,7 @@ export function ReviewScreen({
       <div className="min-h-screen bg-white flex flex-col items-center justify-center">
         <p className="text-lg text-gray-600">Resume not found.</p>
         {loadError && <p className="text-sm text-red-600">{loadError}</p>}
-        <Button onClick={() => navigate('/reviewer')} className="mt-4">Back</Button>
+        <Button onClick={() => navigate('/reviewer')} className="mt-4">Back to Dashboard</Button>
       </div>
     );
   }
@@ -200,7 +224,7 @@ export function ReviewScreen({
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back
+              Back to Dashboard
             </Button>
 
             <div>
@@ -374,8 +398,13 @@ export function ReviewScreen({
 
                             <button
                               className="text-xs px-2 py-1 bg-red-500 text-white rounded"
-                              onClick={() => {
-                                deleteCommentFromResume(resume.id, activePin.id);
+                              onClick={async () => {
+                                try {
+                                  await deleteCommentFromResume(resume.id, activePin.id);
+                                } catch (error) {
+                                  console.error("Delete failed", error);
+                                  window.alert("Failed to delete comment");
+                                }
                                 setActivePin(null);
                               }}
                             >
@@ -397,10 +426,15 @@ export function ReviewScreen({
                           <div className="flex justify-end gap-2 mt-2">
                             <button
                               className="px-2 py-1 text-xs bg-blue-600 text-white rounded"
-                              onClick={() => {
-                                editCommentInResume(resume.id, activePin.id, pinEditText.trim());
-                                setActivePin(null);
-                                setEditingPin(false);
+                              onClick={async () => {
+                                try {
+                                  await editCommentInResume(resume.id, activePin.id, pinEditText.trim());
+                                  setActivePin(null);
+                                  setEditingPin(false);
+                                } catch (error) {
+                                  console.error("Edit failed", error);
+                                  window.alert("Failed to edit comment");
+                                }
                               }}
                             >
                               Save
@@ -458,18 +492,23 @@ export function ReviewScreen({
                           onClick={async () => {
                             if (!popupText.trim()) return;
 
-                            await addCommentToResume(resume.id, {
-                              text: popupText.trim(),
-                              authorId: user.id,
-                              authorName: user.name,
-                              resolved: false,
-                              x: popupPos.x,
-                              y: popupPos.y,
-                            });
+                            try {
+                              await addCommentToResume(resume.id, {
+                                text: popupText.trim(),
+                                authorId: user.id,
+                                authorName: user.name,
+                                resolved: false,
+                                x: popupPos.x,
+                                y: popupPos.y,
+                              });
 
-                            setPopupPos(null);
-                            setPopupText("");
-                            setAddPinMode(false);
+                              setPopupPos(null);
+                              setPopupText("");
+                              setAddPinMode(false);
+                            } catch (error) {
+                              console.error("Add comment failed", error);
+                              window.alert("Failed to add comment");
+                            }
                           }}
                         >
                           Save
@@ -515,7 +554,7 @@ export function ReviewScreen({
                 <Textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Write feedback..."
+                  placeholder="Give feedback here..."
                   rows={4}
                 />
 
