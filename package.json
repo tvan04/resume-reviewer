@@ -97,7 +97,7 @@
     "vite": "^7.1.7"
   },
   "engines": {
-    "node": "20"
+    "node": ">=18 <21"
   },
   "keywords": [
     "react",
