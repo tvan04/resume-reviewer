@@ -1,8 +1,34 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AccountScreen } from "../../components/AccountScreen";
 
-// ---- MOCKS ----
+// ---- FIREBASE MOCKS ----
+jest.mock("firebase/auth", () => ({
+  getAuth: jest.fn(() => ({
+    currentUser: { uid: "test-uid" },
+  })),
+  updatePassword: jest.fn(),
+  deleteUser: jest.fn(),
+}));
+
+jest.mock("firebase/firestore", () => ({
+  getFirestore: jest.fn(),
+  doc: jest.fn(),
+  updateDoc: jest.fn(),
+  deleteDoc: jest.fn(),
+  collection: jest.fn(),
+  query: jest.fn(),
+  where: jest.fn(),
+  getDocs: jest.fn(() =>
+    Promise.resolve({
+      forEach: () => {},
+      docs: [],
+      empty: true,
+    })
+  ),
+}));
+
+// ---- EXISTING MOCKS ----
 const mockNavigate = jest.fn();
 
 jest.mock("react-router-dom", () => ({
@@ -40,33 +66,43 @@ describe("AccountScreen", () => {
     jest.clearAllMocks();
   });
 
-  it("toggles edit mode and saves changes", () => {
+  it("toggles edit mode and saves changes", async () => {
     render(
       <MemoryRouter>
         <AccountScreen user={mockUser} onLogout={jest.fn()} />
       </MemoryRouter>
     );
 
+    // Let the useEffect + async stats fetch settle
+    await waitFor(() => {
+      expect(screen.getByTestId("nav")).toBeInTheDocument();
+    });
+
     fireEvent.click(screen.getByText(/Edit Profile/i));
     expect(screen.getByText(/Save Changes/i)).toBeInTheDocument();
 
-    const nameInput = screen.getByLabelText(/Full Name/i);
+    // Use label and cast to HTMLInputElement so TS knows about .value
+    const nameInput = screen.getByLabelText(/Full Name/i) as HTMLInputElement;
+
     fireEvent.change(nameInput, { target: { value: "Jane Doe" } });
-    expect((nameInput as HTMLInputElement).value).toBe("Jane Doe");
+    expect(nameInput.value).toBe("Jane Doe");
 
     fireEvent.click(screen.getByText(/Save Changes/i));
     expect(screen.queryByText(/Save Changes/i)).not.toBeInTheDocument();
   });
 
-  it("navigates back to dashboard based on user type", () => {
+  it("navigates back to dashboard based on user type", async () => {
     render(
       <MemoryRouter>
         <AccountScreen user={mockUser} onLogout={jest.fn()} />
       </MemoryRouter>
     );
 
+    await waitFor(() => {
+      expect(screen.getByTestId("nav")).toBeInTheDocument();
+    });
+
     fireEvent.click(screen.getByText(/Back to Dashboard/i));
     expect(mockNavigate).toHaveBeenCalledWith("/student");
   });
-
 });

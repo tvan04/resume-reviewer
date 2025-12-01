@@ -246,9 +246,6 @@ export function ReviewerDashboard({
           <h1 className="text-[64px] font-bold text-black tracking-[-1.28px] leading-normal mb-2">
             Welcome, {user.name}
           </h1>
-          <p className="text-[24px] text-[rgba(0,0,0,0.75)] mb-8">
-            All uploaded resumes
-          </p>
         </div>
 
         {loading && <p className="mb-6 text-gray-500">Loading resumes…</p>}
