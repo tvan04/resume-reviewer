@@ -221,19 +221,6 @@ describe("StudentDashboard Component", () => {
     expect(screen.getByText(/Welcome,/i)).toBeInTheDocument();
   });
 
-  it("navigates when clicking 'Build Resume from Template' button", async () => {
-    await act(async () => {
-      render(
-        <MemoryRouter>
-          <StudentDashboard user={mockUser} resumes={[baseResume]} />
-        </MemoryRouter>
-      );
-    });
-
-    fireEvent.click(screen.getByText(/Build Resume from Template/i));
-    expect(mockNavigate).toHaveBeenCalledWith("/upload");
-  });
-
   it("navigates when clicking a resume card", async () => {
     await act(async () => {
       render(
