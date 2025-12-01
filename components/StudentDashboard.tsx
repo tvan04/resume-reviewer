@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavigationBar } from './Navigation';
-import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import {
@@ -242,22 +241,6 @@ export function StudentDashboard({
           <h1 className="text-[64px] font-bold text-black tracking-[-1.28px] leading-normal mb-6">
             Welcome, {user.name}
           </h1>
-
-          <div className="flex gap-4 mb-8">
-            <Button
-              variant="default"
-              onClick={() => navigate('/upload')}
-              className="px-6 py-3 text-2xl"
-            >
-              Build Resume from Template
-            </Button>
-            <Button
-              variant="secondary"
-              className="bg-[#e6e6e6] text-black px-6 py-3 text-2xl"
-            >
-              Print Uploaded Resume
-            </Button>
-          </div>
         </div>
 
         {loading && <p className="mb-6 text-gray-500">Loading your resumes…</p>}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NavigationBar } from './Navigation';
 import { Button } from './ui/button';
@@ -6,48 +6,243 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Switch } from './ui/switch';
 import { Separator } from './ui/separator';
 import { Alert, AlertDescription } from './ui/alert';
 import { 
-  User as UserIcon, 
-  Bell, 
+  User as UserIcon,
   Shield, 
-  Download,
   Trash2,
   ArrowLeft,
   Save,
   Settings
 } from 'lucide-react';
 import { User } from '../src/App';
+import app from '../src/firebaseConfig';
+import { getFirestore, doc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getAuth, updatePassword, deleteUser } from 'firebase/auth';
 
 interface AccountScreenProps {
   user: User;
   onLogout: () => void;
+  onUserUpdate?: (user: User) => void; // <-- add this
 }
 
-export function AccountScreen({ user, onLogout }: AccountScreenProps) {
+export function AccountScreen({ user, onLogout, onUserUpdate }: AccountScreenProps) {
   const navigate = useNavigate();
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState(user);
-  const [notifications, setNotifications] = useState({
-    emailOnNewComment: true,
-    emailOnStatusChange: true,
-    emailOnApproval: true,
-    pushNotifications: false
-  });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleSave = () => {
+  // --- Statistics state ---
+  const [stats, setStats] = useState({
+    resumesSubmitted: 0,      // student: resumes submitted
+    resumesApproved: 0,       // student: resumes approved
+    commentsReceived: 0,      // student: comments from reviewers
+    resumesReceived: 0,       // reviewer: resumes assigned to them
+    resumesApprovedByReviewer: 0, // reviewer: resumes they approved
+    commentsReceivedFromStudents: 0, // reviewer: comments from students (replies)
+  });
+
+  // --- Password change modal state ---
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  // --- Save profile changes (name only) ---
+  const handleSave = async () => {
     setIsEditing(false);
-    // Optionally show a success message
+    try {
+      await updateDoc(doc(db, 'users', user.id), { name: editedUser.name });
+      onUserUpdate?.({ ...user, name: editedUser.name });
+
+      if (user.type === 'student') {
+        // Update studentName in all their resumes
+        const q = query(collection(db, 'resumes'), where('studentId', '==', user.id));
+        const snap = await getDocs(q);
+        const updates: Promise<void>[] = [];
+        snap.forEach((resumeDoc) => {
+          // Update studentName
+          updates.push(updateDoc(resumeDoc.ref, { studentName: editedUser.name }));
+          // Update replies' authorName if any replies from this student
+          const data = resumeDoc.data();
+          if (Array.isArray(data.comments)) {
+            let changed = false;
+            const updatedComments = data.comments.map((c: any) => {
+              if (Array.isArray(c.replies)) {
+                let repliesChanged = false;
+                const updatedReplies = c.replies.map((r: any) => {
+                  if (r.authorId === user.id && r.authorName !== editedUser.name) {
+                    repliesChanged = true;
+                    changed = true;
+                    return { ...r, authorName: editedUser.name };
+                  }
+                  return r;
+                });
+                if (repliesChanged) {
+                  return { ...c, replies: updatedReplies };
+                }
+              }
+              return c;
+            });
+            if (changed) {
+              updates.push(updateDoc(resumeDoc.ref, { comments: updatedComments }));
+            }
+          }
+        });
+        await Promise.all(updates);
+      } else if (user.type === 'reviewer') {
+        // Update authorName in all comments authored by this reviewer
+        const q = query(collection(db, 'resumes'), where('sharedWithIds', 'array-contains', user.id));
+        const snap = await getDocs(q);
+        const updates: Promise<void>[] = [];
+        snap.forEach((resumeDoc) => {
+          const data = resumeDoc.data();
+          if (Array.isArray(data.comments)) {
+            let changed = false;
+            const updatedComments = data.comments.map((c: any) => {
+              let commentChanged = false;
+              // Update comment authorName
+              let updatedComment = c;
+              if (c.authorId === user.id && c.authorName !== editedUser.name) {
+                updatedComment = { ...c, authorName: editedUser.name };
+                commentChanged = true;
+                changed = true;
+              }
+              // Update replies authored by this reviewer
+              if (Array.isArray(c.replies)) {
+                let repliesChanged = false;
+                const updatedReplies = c.replies.map((r: any) => {
+                  if (r.authorId === user.id && r.authorName !== editedUser.name) {
+                    repliesChanged = true;
+                    changed = true;
+                    return { ...r, authorName: editedUser.name };
+                  }
+                  return r;
+                });
+                if (repliesChanged) {
+                  updatedComment = { ...updatedComment, replies: updatedReplies };
+                  commentChanged = true;
+                }
+              }
+              return commentChanged ? updatedComment : c;
+            });
+            if (changed) {
+              updates.push(updateDoc(resumeDoc.ref, { comments: updatedComments }));
+            }
+          }
+        });
+        await Promise.all(updates);
+      }
+    } catch (err) {
+      alert('Failed to update profile.');
+    }
   };
 
-  const handleDeleteAccount = () => {
-    setShowDeleteConfirm(false);
-    onLogout();
-    navigate('/login'); // redirect to login after deletion
+  // --- Change password ---
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters.');
+      return;
+    }
+    try {
+      if (auth.currentUser) {
+        await updatePassword(auth.currentUser, newPassword);
+        setPasswordSuccess('Password updated successfully.');
+        setShowPasswordModal(false);
+        setNewPassword('');
+      }
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to update password.');
+    }
   };
+
+  // --- Delete account ---
+  const handleDeleteAccount = async () => {
+    setShowDeleteConfirm(false);
+    try {
+      // If student, delete all their resumes
+      if (user.type === 'student') {
+        const q = query(collection(db, 'resumes'), where('studentId', '==', user.id));
+        const snap = await getDocs(q);
+        const batchDeletes: Promise<void>[] = [];
+        snap.forEach((resumeDoc) => {
+          batchDeletes.push(deleteDoc(resumeDoc.ref));
+        });
+        await Promise.all(batchDeletes);
+      }
+      // Delete user doc from Firestore
+      await deleteDoc(doc(db, 'users', user.id));
+      // Delete user from Auth
+      if (auth.currentUser) {
+        await deleteUser(auth.currentUser);
+      }
+      onLogout();
+      navigate('/login');
+    } catch (err) {
+      alert('Failed to delete account. Please re-login and try again.');
+    }
+  };
+
+  // --- Fetch statistics ---
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user?.id) return;
+      if (user.type === 'student') {
+        const q = query(collection(db, 'resumes'), where('studentId', '==', user.id));
+        const snap = await getDocs(q);
+        let resumesSubmitted = 0, resumesApproved = 0, commentsReceived = 0;
+        snap.forEach(doc => {
+          resumesSubmitted++;
+          const data = doc.data();
+          if (data.status === 'approved') resumesApproved++;
+          if (Array.isArray(data.comments)) {
+            // Only count comments from reviewers (not student themselves)
+            commentsReceived += data.comments.filter((c: any) => c.authorId !== user.id).length;
+          }
+        });
+        setStats({
+          resumesSubmitted,
+          resumesApproved,
+          commentsReceived,
+          resumesReceived: 0,
+          resumesApprovedByReviewer: 0,
+          commentsReceivedFromStudents: 0,
+        });
+      } else if (user.type === 'reviewer') {
+        const q = query(collection(db, 'resumes'), where('sharedWithIds', 'array-contains', user.id));
+        const snap = await getDocs(q);
+        let resumesReceived = 0, resumesApprovedByReviewer = 0, commentsReceivedFromStudents = 0;
+        snap.forEach(doc => {
+          resumesReceived++;
+          const data = doc.data();
+          if (data.status === 'approved') resumesApprovedByReviewer++;
+          if (Array.isArray(data.comments)) {
+            // Count replies from students to this reviewer's comments
+            data.comments.forEach((c: any) => {
+              if (Array.isArray(c.replies)) {
+                commentsReceivedFromStudents += c.replies.filter((r: any) => r.authorId !== user.id).length;
+              }
+            });
+          }
+        });
+        setStats({
+          resumesSubmitted: 0,
+          resumesApproved: 0,
+          commentsReceived: 0,
+          resumesReceived,
+          resumesApprovedByReviewer,
+          commentsReceivedFromStudents,
+        });
+      }
+    };
+    fetchStats();
+  }, [db, user]);
 
   // remove custom onNavigate usage — use react-router directly
   const goToDashboard = () => {
@@ -83,9 +278,8 @@ export function AccountScreen({ user, onLogout }: AccountScreenProps) {
 
         <div className="max-w-4xl">
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="notifications">Notifications</TabsTrigger>
               <TabsTrigger value="privacy">Privacy</TabsTrigger>
               <TabsTrigger value="account">Account</TabsTrigger>
             </TabsList>
@@ -134,8 +328,7 @@ export function AccountScreen({ user, onLogout }: AccountScreenProps) {
                         id="email"
                         type="email"
                         value={editedUser.email}
-                        onChange={(e) => setEditedUser(prev => ({ ...prev, email: e.target.value }))}
-                        disabled={!isEditing}
+                        disabled // Email editing disabled
                       />
                     </div>
                   </div>
@@ -162,117 +355,34 @@ export function AccountScreen({ user, onLogout }: AccountScreenProps) {
                       {user.type === 'student' ? (
                         <>
                           <div className="text-center p-4 bg-blue-50 rounded">
-                            <div className="text-2xl font-bold text-blue-600">3</div>
-                            <div className="text-sm text-gray-600">Resumes Uploaded</div>
+                            <div className="text-2xl font-bold text-blue-600">{stats.resumesSubmitted}</div>
+                            <div className="text-sm text-gray-600">Resumes Submitted</div>
                           </div>
                           <div className="text-center p-4 bg-green-50 rounded">
-                            <div className="text-2xl font-bold text-green-600">1</div>
-                            <div className="text-sm text-gray-600">Approved Resumes</div>
+                            <div className="text-2xl font-bold text-green-600">{stats.resumesApproved}</div>
+                            <div className="text-sm text-gray-600">Resumes Approved</div>
                           </div>
                           <div className="text-center p-4 bg-orange-50 rounded">
-                            <div className="text-2xl font-bold text-orange-600">5</div>
+                            <div className="text-2xl font-bold text-orange-600">{stats.commentsReceived}</div>
                             <div className="text-sm text-gray-600">Comments Received</div>
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="text-center p-4 bg-blue-50 rounded">
-                            <div className="text-2xl font-bold text-blue-600">15</div>
-                            <div className="text-sm text-gray-600">Resumes Reviewed</div>
+                            <div className="text-2xl font-bold text-blue-600">{stats.resumesReceived}</div>
+                            <div className="text-sm text-gray-600">Resumes Received</div>
                           </div>
                           <div className="text-center p-4 bg-green-50 rounded">
-                            <div className="text-2xl font-bold text-green-600">12</div>
-                            <div className="text-sm text-gray-600">Approved</div>
+                            <div className="text-2xl font-bold text-green-600">{stats.resumesApprovedByReviewer}</div>
+                            <div className="text-sm text-gray-600">Resumes Approved</div>
                           </div>
                           <div className="text-center p-4 bg-orange-50 rounded">
-                            <div className="text-2xl font-bold text-orange-600">23</div>
-                            <div className="text-sm text-gray-600">Comments Added</div>
+                            <div className="text-2xl font-bold text-orange-600">{stats.commentsReceivedFromStudents}</div>
+                            <div className="text-sm text-gray-600">Comments Received</div>
                           </div>
                         </>
                       )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Notifications Tab */}
-            <TabsContent value="notifications">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bell className="w-5 h-5" />
-                    Notification Preferences
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Email Notifications</h3>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">New Comments</p>
-                        <p className="text-sm text-gray-600">
-                          Get notified when reviewers add comments to your resume
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.emailOnNewComment}
-                        onCheckedChange={(checked: boolean) => 
-                          setNotifications(prev => ({ ...prev, emailOnNewComment: checked }))
-                        }
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Status Changes</p>
-                        <p className="text-sm text-gray-600">
-                          Get notified when your resume status changes
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.emailOnStatusChange}
-                        onCheckedChange={(checked: boolean) => 
-                          setNotifications(prev => ({ ...prev, emailOnStatusChange: checked }))
-                        }
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Resume Approvals</p>
-                        <p className="text-sm text-gray-600">
-                          Get notified when your resume is approved
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.emailOnApproval}
-                        onCheckedChange={(checked: boolean) => 
-                          setNotifications(prev => ({ ...prev, emailOnApproval: checked }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Push Notifications</h3>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Browser Notifications</p>
-                        <p className="text-sm text-gray-600">
-                          Receive instant notifications in your browser
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.pushNotifications}
-                        onCheckedChange={(checked: boolean) => 
-                          setNotifications(prev => ({ ...prev, pushNotifications: checked }))
-                        }
-                      />
                     </div>
                   </div>
                 </CardContent>
@@ -292,29 +402,9 @@ export function AccountScreen({ user, onLogout }: AccountScreenProps) {
                   <Alert>
                     <Shield className="h-4 w-4" />
                     <AlertDescription>
-                      Your data is protected by Vanderbilt's security policies. Resume files are encrypted 
-                      and only accessible to you and assigned reviewers.
+                      Resume files are only accessible to you and assigned reviewers.
                     </AlertDescription>
                   </Alert>
-
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Data Management</h3>
-                    
-                    <div className="flex items-center justify-between p-4 border rounded">
-                      <div>
-                        <p className="font-medium">Download Your Data</p>
-                        <p className="text-sm text-gray-600">
-                          Export all your resumes and feedback
-                        </p>
-                      </div>
-                      <Button variant="outline">
-                        <Download className="w-4 h-4 mr-2" />
-                        Download
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
 
                   <div className="space-y-4">
                     <h3 className="font-medium">Access Control</h3>
@@ -328,7 +418,6 @@ export function AccountScreen({ user, onLogout }: AccountScreenProps) {
                       <ul className="text-sm space-y-1">
                         <li>• Career Center staff can view assigned resumes</li>
                         <li>• You can revoke access at any time</li>
-                        <li>• All access is logged for security</li>
                       </ul>
                     </div>
                   </div>
@@ -348,23 +437,11 @@ export function AccountScreen({ user, onLogout }: AccountScreenProps) {
                       <div>
                         <p className="font-medium">Change Password</p>
                         <p className="text-sm text-gray-600">
-                          Update your Vanderbilt credentials
+                          Update your credentials
                         </p>
                       </div>
-                      <Button variant="outline">
+                      <Button variant="outline" onClick={() => setShowPasswordModal(true)}>
                         Change Password
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 border rounded">
-                      <div>
-                        <p className="font-medium">Two-Factor Authentication</p>
-                        <p className="text-sm text-gray-600">
-                          Add an extra layer of security
-                        </p>
-                      </div>
-                      <Button variant="outline">
-                        Enable 2FA
                       </Button>
                     </div>
                   </CardContent>
@@ -427,6 +504,27 @@ export function AccountScreen({ user, onLogout }: AccountScreenProps) {
           </Tabs>
         </div>
       </div>
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 shadow-lg w-full max-w-sm">
+            <h2 className="text-xl font-bold mb-4">Change Password</h2>
+            <input
+              type="password"
+              className="border rounded px-3 py-2 w-full mb-2"
+              placeholder="New password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+            />
+            {passwordError && <div className="text-red-600 text-sm mb-2">{passwordError}</div>}
+            {passwordSuccess && <div className="text-green-600 text-sm mb-2">{passwordSuccess}</div>}
+            <div className="flex gap-2 mt-4">
+              <Button onClick={handleChangePassword}>Update</Button>
+              <Button variant="outline" onClick={() => setShowPasswordModal(false)}>Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
