@@ -34,10 +34,24 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       const res = await signInWithEmailAndPassword(auth, email, password);
       const userRef = doc(db, 'users', res.user.uid);
       const userSnap = await getDoc(userRef);
-      const role = (userSnap.exists() ? (userSnap.data().role as 'student' | 'reviewer') : 'student') || 'student';
+      let name: string;
+      let role: 'student' | 'reviewer' = 'student';
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        if (typeof data.name === 'string' && data.name.trim() !== '') {
+          name = data.name;
+        } else {
+          // fallback: use email prefix if name missing/empty
+          name = res.user.email?.split('@')[0] ?? '';
+        }
+        if (data.role === 'reviewer' || data.role === 'student') role = data.role;
+      } else {
+        // fallback: use email prefix if no user doc
+        name = res.user.email?.split('@')[0] ?? '';
+      }
       const userObj: User = {
         id: res.user.uid,
-        name: res.user.displayName ?? res.user.email?.split('@')[0] ?? '',
+        name,
         email: res.user.email ?? '',
         type: role,
       };
