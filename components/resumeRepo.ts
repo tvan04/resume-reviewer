@@ -8,12 +8,20 @@ import {
   arrayUnion,
   arrayRemove,
   Timestamp,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+  serverTimestamp,
+  runTransaction,
+  deleteDoc,
 } from 'firebase/firestore';
 import { Resume, Comment, Reply } from '../src/App';
 
 const db = getFirestore(app);
 
-//   SUBSCRIBE TO RESUME
+// SUBSCRIBE TO RESUME
 export function subscribeToResume(
   resumeId: string,
   onData: (resume: Resume | null) => void,
@@ -30,7 +38,7 @@ export function subscribeToResume(
 
       const data = snap.data() as any;
 
-      // ✅ Normalize Firestore Timestamps into ISO strings
+      // Normalize Firestore Timestamps into ISO strings
       const normalized = {
         ...data,
         uploadDate:
@@ -67,7 +75,7 @@ export function subscribeToResume(
   );
 }
 
-//   COMMENT HELPERS
+// COMMENT HELPERS
 async function getResumeComments(resumeId: string) {
   const ref = fsDoc(db, 'resumes', resumeId);
   const snap = await getDoc(ref);
@@ -140,7 +148,7 @@ export async function updateResumeStatus(resumeId: string, status: Resume['statu
   await updateDoc(ref, { status });
 }
 
-//   SHARING HELPERS
+// SHARING HELPERS
 export async function updateResumeSharing(
   resumeId: string,
   sharedWith: { id: string; name: string }[]
@@ -167,4 +175,104 @@ export async function removeReviewerFromResume(
   await updateDoc(ref, {
     sharedWith: arrayRemove(reviewer),
   });
+}
+
+// ---------- Version history helpers ----------
+export interface ResumeVersion {
+  id?: string;
+  versionNumber: number;
+  fileName?: string;
+  downloadURL?: string;
+  storagePath?: string;
+  uploadedAt?: any;
+  uploadedBy?: string | null;
+  note?: string;
+}
+
+/**
+ * List versions for a resume (newest first)
+ */
+export async function listResumeVersions(resumeId: string): Promise<ResumeVersion[]> {
+  const versionsRef = collection(db, 'resumes', resumeId, 'versions');
+  const q = query(versionsRef, orderBy('versionNumber', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as ResumeVersion[];
+}
+
+/**
+ * Create a version record from the current resume doc.
+ * Returns created version doc id.
+ */
+export async function createVersionFromCurrent(resumeId: string, note?: string) {
+  const resumeRef = fsDoc(db, 'resumes', resumeId);
+  const snap = await getDoc(resumeRef);
+  if (!snap.exists()) throw new Error('Resume not found');
+
+  const data = snap.data() as any;
+  const versionPayload: Partial<ResumeVersion> = {
+    versionNumber: data.version ?? 1,
+    fileName: data.fileName,
+    downloadURL: data.downloadURL,
+    storagePath: data.storagePath,
+    uploadedAt: data.uploadDate ?? serverTimestamp(),
+    uploadedBy: data.studentId ?? null,
+    note: note ?? undefined,
+  };
+
+  const versionsRef = collection(db, 'resumes', resumeId, 'versions');
+  const added = await addDoc(versionsRef, versionPayload as any);
+  return added.id;
+}
+
+/**
+ * Restore a saved version as the current resume.
+ * This creates a version for the current state (audit), then makes the selected version current.
+ */
+export async function restoreVersion(resumeId: string, versionId: string) {
+  const resumeRef = fsDoc(db, 'resumes', resumeId);
+  const versionRef = fsDoc(db, 'resumes', resumeId, 'versions', versionId);
+
+  await runTransaction(db, async (tx) => {
+    const resumeSnap = await tx.get(resumeRef);
+    if (!resumeSnap.exists()) throw new Error('Resume not found');
+
+    const versionSnap = await tx.get(versionRef);
+    if (!versionSnap.exists()) throw new Error('Version not found');
+
+    const current = resumeSnap.data() as any;
+    const versionData = versionSnap.data() as any;
+
+    // create an audit version for current state
+    const versionsColl = collection(db, 'resumes', resumeId, 'versions');
+    const newVersionDocRef = fsDoc(db, 'resumes', resumeId, 'versions', (await addDoc(versionsColl, {})).id);
+    // Note: created a placeholder doc above to get an id; set below with real payload
+    const auditPayload = {
+      versionNumber: current.version ?? 1,
+      fileName: current.fileName,
+      downloadURL: current.downloadURL,
+      storagePath: current.storagePath,
+      uploadedAt: current.uploadDate ?? serverTimestamp(),
+      uploadedBy: current.studentId ?? null,
+      note: 'auto-created before restore',
+    };
+    tx.set(newVersionDocRef, auditPayload as any);
+
+    // update resume doc to point to selected version file
+    const newVersionNumber = (current.version ?? 1) + 1;
+    tx.update(resumeRef, {
+      fileName: versionData.fileName,
+      downloadURL: versionData.downloadURL,
+      storagePath: versionData.storagePath,
+      uploadDate: serverTimestamp(),
+      version: newVersionNumber,
+    });
+  });
+}
+
+/**
+ * Delete a specific version (not the current resume).
+ */
+export async function deleteResumeVersion(resumeId: string, versionId: string) {
+  const versionRef = fsDoc(db, 'resumes', resumeId, 'versions', versionId);
+  await deleteDoc(versionRef);
 }
