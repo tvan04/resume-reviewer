@@ -20,15 +20,16 @@ import {
   X as XIcon,
   Plus as PlusIcon,
   Info as InfoIcon,
-  MapPin, // <-- add MapPin
+  MapPin,
 } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 import { User, Resume } from "../src/App";
 import app, { storage } from "../src/firebaseConfig";
 import { getFirestore, doc as fsDoc, deleteDoc, arrayRemove, arrayUnion } from "firebase/firestore";
-import { subscribeToResume, addReplyToComment, toggleCommentResolved } from "./resumeRepo";
+import { subscribeToResume, addReplyToComment, toggleCommentResolved, createVersionFromCurrent } from "./resumeRepo";
 import { collection, getDocs, query, where, updateDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { VersionHistory } from "./VersionHistory";
 
 const formatDate = (dateValue: any) => {
   if (!dateValue) return "Unknown date";
@@ -121,7 +122,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
     y: number;
     resolved?: boolean;
   }>(null);
-
 
   // Reviewers directory + UI state (mirrors UploadScreen)
   const [reviewers, setReviewers] = useState<{ id: string; name: string; email?: string }[]>([]);
@@ -237,6 +237,14 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
     try {
       setUploading(true);
       setUploadProgress(0);
+
+      // Archive current version before replacing
+      try {
+        await createVersionFromCurrent(resume.id!, 'pre-replace');
+      } catch (err) {
+        // non-fatal: continue even if archiving fails
+        console.warn('createVersionFromCurrent failed', err);
+      }
 
       const storageRef = ref(storage, `resumes/${resume.id}/${newFile.name}`);
       const uploadTask = await uploadBytes(storageRef, newFile);
@@ -584,12 +592,11 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                         className="absolute bg-white border shadow-xl rounded-md p-3 w-64 z-[1000000]"
                         style={{
                           top: activePin.y,
-                          left: activePin.x + 40, // offset slightly to the right of the pin
+                          left: activePin.x + 40,
                           transform: "translate(-50%, -50%)",
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {/* Close (X) */}
                         <button
                           className="absolute top-1 right-1 text-gray-500 hover:text-gray-700"
                           onClick={() => setActivePin(null)}
@@ -597,7 +604,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                           ✕
                         </button>
 
-                        {/* Reviewer name and comment time */}
                         {(() => {
                           const pinComment = resume.comments.find(c => c.id === activePin.id);
                           if (!pinComment) return null;
@@ -609,10 +615,8 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                           );
                         })()}
 
-                        {/* Text description */}
                         <p className="text-sm mb-4 pr-5">{activePin.text}</p>
 
-                        {/* Resolve button (students only, and only if not already resolved) */}
                         {user.type === "student" && !activePin.resolved && (
                           <div className="flex justify-end">
                             <Button
@@ -629,7 +633,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                           </div>
                         )}
 
-                        {/* If already resolved, just show a note */}
                         {activePin.resolved && (
                           <p className="text-xs text-green-600 font-medium mt-2">
                             This comment has been marked as resolved.
@@ -738,7 +741,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                         </h4>
                         {unresolvedComments.map((comment: any) => (
                           <div key={comment.id} className="border-l-4 border-red-200 pl-4 mb-4 relative">
-                            {/* ...existing code for header and actions... */}
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 {typeof comment.x === "number" && typeof comment.y === "number" && (
@@ -761,7 +763,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                               )}
                             </div>
                             <p className="text-sm mb-3 bg-red-50 p-3 rounded">{comment.text}</p>
-
 
                             <div className="ml-4 space-y-2 border-l border-gray-200 pl-3">
                               {(comment.replies ?? []).map((reply: any) => (
@@ -801,7 +802,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                         </h4>
                         {resolvedComments.map((comment: any) => (
                           <div key={comment.id} className="border-l-2 border-green-200 pl-4 mb-4 opacity-75 relative">
-                            {/* ...existing code for header and badge... */}
                             <div className="flex items-start justify-between mb-2">
                               <div>
                                 <p className="font-medium text-sm flex items-center gap-2">
@@ -816,7 +816,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                               </Badge>
                             </div>
                             <p className="text-sm">{comment.text}</p>
-
                           </div>
                         ))}
                       </div>
@@ -838,7 +837,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                   <CardTitle>Manage Access</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Tiny banner for success/error/info */}
                   {banner && (
                     <div
                       className={[
@@ -862,7 +860,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                     </div>
                   )}
 
-                  {/* Current Access */}
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-2">Current reviewers</p>
                     {sharedIds.length === 0 ? (
@@ -882,7 +879,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                                 title={`Revoke ${r.name}`}
                                 className="hover:text-blue-900"
                                 onClick={() => {
-                                  // Confirm alert before revoking (disruptive action)
                                   if (window.confirm(`Remove ${r.name}'s access to this resume?`)) {
                                     revokeReviewer(r.id, r.name);
                                   }
@@ -952,15 +948,13 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                 <CardTitle>Version History</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                    <div>
-                      <p className="text-sm font-medium">v{resume.version} (Current)</p>
-                      <p className="text-xs text-gray-600">{formatDate(resume.uploadDate)}</p>
-                    </div>
-                    <Badge variant="secondary">Latest</Badge>
-                  </div>
-                </div>
+                <VersionHistory
+                  resumeId={resume.id!}
+                  currentVersion={resume.version}
+                  onRestored={() => {
+                    showBanner("Version restored — current resume updated.", "success", 4000);
+                  }}
+                />
               </CardContent>
             </Card>
           </div>

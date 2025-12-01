@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCPnbvwi6E9cfN96yKjCYPOj5RlvwcUZtQ",
   authDomain: "resume-reviewer-d6d4b.firebaseapp.com",
   projectId: "resume-reviewer-d6d4b",
-  storageBucket: "resume-reviewer-d6d4b.appspot.com",
+  storageBucket: "resume-reviewer-d6d4b.firebasestorage.app",
   messagingSenderId: "980681427071",
   appId: "1:980681427071:web:911d9b559695d7045c174a",
   measurementId: "G-3PDWLXGSLV"
