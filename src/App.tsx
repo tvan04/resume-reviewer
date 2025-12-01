@@ -192,7 +192,11 @@ export default function App() {
           path="/account"
           element={
             currentUser ? (
-              <AccountScreen user={currentUser} onLogout={handleLogout} />
+              <AccountScreen
+                user={currentUser}
+                onLogout={handleLogout}
+                onUserUpdate={(u) => setCurrentUser(u)} // update user state
+              />
             ) : (
               <Navigate to="/login" replace />
             )
