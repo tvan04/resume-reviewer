@@ -26,7 +26,6 @@ import {
   MapPin
 } from 'lucide-react';
 
-import { ImageWithFallback } from './ImageWithFallback';
 import { User, Resume, Comment } from '../src/App';
 
 import {
