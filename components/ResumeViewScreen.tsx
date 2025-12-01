@@ -740,13 +740,20 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                           <div key={comment.id} className="border-l-4 border-red-200 pl-4 mb-4 relative">
                             {/* ...existing code for header and actions... */}
                             <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="font-medium text-sm flex items-center gap-2">
-                                  <UserIcon className="w-3 h-3" />
-                                  {comment.authorName}
-                                </p>
-                                <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
+                              <div className="flex items-center gap-2">
+                                {typeof comment.x === "number" && typeof comment.y === "number" && (
+                                  <MapPin className="w-4 h-4 text-red-500" />
+                                )}
+
+                                <div>
+                                  <p className="font-medium text-sm flex items-center gap-2">
+                                    <UserIcon className="w-3 h-3" />
+                                    {comment.authorName}
+                                  </p>
+                                  <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
+                                </div>
                               </div>
+
                               {user.type === "student" && (
                                 <Button variant="outline" size="sm" onClick={() => markResolved(comment.id)}>
                                   <CheckCircle className="w-3 h-3 mr-1" /> Mark Resolved
@@ -755,12 +762,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                             </div>
                             <p className="text-sm mb-3 bg-red-50 p-3 rounded">{comment.text}</p>
 
-                            {/* Pin icon if comment is a pin, bottom right */}
-                            {typeof comment.x === 'number' && typeof comment.y === 'number' && (
-                              <MapPin
-                                className="w-4 h-4 text-red-600 absolute bottom-2 right-2"
-                              />
-                            )}
 
                             <div className="ml-4 space-y-2 border-l border-gray-200 pl-3">
                               {(comment.replies ?? []).map((reply: any) => (
@@ -816,12 +817,6 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                             </div>
                             <p className="text-sm">{comment.text}</p>
 
-                            {/* Pin icon if comment is a pin, bottom right */}
-                            {typeof comment.x === 'number' && typeof comment.y === 'number' && (
-                              <MapPin
-                                className="w-4 h-4 text-red-600 absolute bottom-2 right-2"
-                              />
-                            )}
                           </div>
                         ))}
                       </div>
