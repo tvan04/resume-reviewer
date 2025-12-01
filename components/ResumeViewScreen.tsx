@@ -112,6 +112,16 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
   // per-comment reply inputs
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
 
+  // Active pin popup (for inline comments)
+  const [activePin, setActivePin] = useState<null | {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    resolved?: boolean;
+  }>(null);
+
+
   // Reviewers directory + UI state (mirrors UploadScreen)
   const [reviewers, setReviewers] = useState<{ id: string; name: string; email?: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -503,24 +513,118 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
               </CardHeader>
               <CardContent>
                 {resume.downloadURL ? (
-                  <div className="bg-gray-100 min-h-[800px] rounded-lg overflow-hidden">
+                  <div className="relative bg-gray-100 min-h-[800px] rounded-lg overflow-hidden">
+
+                    {/* PDF Viewer */}
                     <object
                       data={resume.downloadURL}
                       type="application/pdf"
                       width="100%"
                       height="800"
-                      aria-label={resume.fileName}
-                    >
-                      <div className="p-6 text-center">
-                        <p className="text-sm text-gray-600 mb-4">
-                          Your browser does not support inline PDFs.{" "}
-                          <a href={resume.downloadURL} target="_blank" rel="noreferrer" className="underline">
-                            Open the resume in a new tab
-                          </a>
-                          .
-                        </p>
-                      </div>
-                    </object>
+                      className="pointer-events-none"
+                      style={{ zIndex: 1, position: "relative" }}
+                    />
+
+                    {/* INLINE PINS FROM REVIEWERS */}
+                    {resume.comments
+                      .filter((c) => typeof c.x === "number" && typeof c.y === "number")
+                      .map((c) => {
+                        const pinColor = c.resolved ? "bg-green-600" : "bg-red-600";
+                        const x = c.x as number;
+                        const y = c.y as number;
+
+                        return (
+                          <div
+                            key={c.id}
+                            style={{
+                              position: "absolute",
+                              top: y,
+                              left: x,
+                              transform: "translate(-50%, -50%)",
+                              zIndex: 999999,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="group absolute -top-3 -left-3 w-6 h-6 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActivePin({
+                                  id: c.id,
+                                  text: c.text,
+                                  x,
+                                  y,
+                                  resolved: c.resolved,
+                                });
+                              }}
+                            >
+                              <div
+                                className={`
+                                  w-3 h-3 rounded-full ${pinColor} shadow-md
+                                  transition-all
+                                  group-hover:scale-125
+                                  group-hover:ring-2
+                                  group-hover:ring-black/40
+                                `}
+                                style={{
+                                  position: "absolute",
+                                  top: "50%",
+                                  left: "50%",
+                                  transform: "translate(-50%, -50%)",
+                                }}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {/* PIN POPUP (student + reviewer view) */}
+                      {activePin && (
+                        <div
+                          className="absolute bg-white border shadow-xl rounded-md p-3 w-64 z-[1000000]"
+                          style={{
+                            top: activePin.y,
+                            left: activePin.x + 40, // offset slightly to the right of the pin
+                            transform: "translate(-50%, -50%)",
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Close (X) */}
+                          <button
+                            className="absolute top-1 right-1 text-gray-500 hover:text-gray-700"
+                            onClick={() => setActivePin(null)}
+                          >
+                            ✕
+                          </button>
+
+                          {/* Text description */}
+                          <p className="text-sm mb-4 pr-5">{activePin.text}</p>
+
+                          {/* Resolve button (students only, and only if not already resolved) */}
+                          {user.type === "student" && !activePin.resolved && (
+                            <div className="flex justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={async () => {
+                                  await markResolved(activePin.id);
+                                  setActivePin(null);
+                                }}
+                              >
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Resolve
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* If already resolved, just show a note */}
+                          {activePin.resolved && (
+                            <p className="text-xs text-green-600 font-medium mt-2">
+                              This comment has been marked as resolved.
+                            </p>
+                          )}
+                        </div>
+                      )}
                   </div>
                 ) : (
                   <div className="bg-gray-100 min-h-[800px] rounded-lg flex items-center justify-center">
