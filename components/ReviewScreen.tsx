@@ -307,8 +307,13 @@ export function ReviewScreen({
                     data={resume.downloadURL}
                     type="application/pdf"
                     width="100%"
-                    height="1000px"
-                    className="rounded-md"
+                    height="1280px"         // ← MUCH taller, matching student behavior
+                    className="pointer-events-none"
+                    style={{
+                      position: "relative",
+                      zIndex: 1,
+                      display: "block"      // ← Important so PDF expands inside container
+                    }}
                   />
 
                   {/* EXISTING PINS */}
