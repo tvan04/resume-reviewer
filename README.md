@@ -8,32 +8,33 @@ Key features include:
 - Resume upload and version control
 - Real-time commenting and feedback
 - Notifications and approval workflows
-- Optional integration with campus printing services
-- Future support for AI-assisted resume editing and generation
+- Possible future support for AI-assisted resume editing and generation
 
 ---
 
 ## Technologies and Frameworks
 
 ### Frontend
-- **React** – Component-based UI development  
-- **Tailwind CSS** – Modern, utility-first styling  
-- **Firebase SDK** – Integration with hosting, authentication, and database  
+- **React** – Component-based UI development
+- **Tailwind CSS** – Modern, utility-first styling
+- **Firebase SDK** – Integration with hosting, authentication, and database
 
 ### Backend & Hosting
-- **Firebase Hosting** – Fast deployment with SSL security  
-- **Firebase Firestore** – Real-time NoSQL database for storing resumes, comments, and user data  
-- **Firebase Authentication** – Role-based access for students and advisors  
-- **(Optional)** **AWS EC2** – Flexible hosting option for future scalability  
+- **Netlify** – Fast deployment with SSL security
+- **Firebase Firestore** – Real-time NoSQL database for storing resumes, comments, and user data
+- **Firebase Authentication** – Role-based access for students and advisors
 
 ### Development & Collaboration
-- **GitHub** – Version control, issue tracking, and project management  
-- **Load Testing Tools** – Ensuring scalability and performance  
-- **Group Chat & Standups** – Team communication and progress alignment  
+- **GitHub** – Version control, issue tracking, and project management
+- **Load Testing Tools** – Ensuring scalability and performance
+- **Group Chat & Standups** – Team communication and progress alignment
 
 ---
 
+## Installation
+To run this project locally, you should have Node.js installed with the npm package manager. You can find the version for your system [here](https://nodejs.org/en/download). Once you've cloned this repository to your system, you can do `npm install` there to install all required dependencies, `npm run dev` to run it locally on your system, and `npm test` to run our test suites made with Jest.
+
 ## Deployment
-The initial deployment will use **Firebase Hosting** for quick setup, seamless integration with Firestore, and built-in scalability. AWS EC2 will be explored as an alternative for more flexible infrastructure management.
+Our deployment uses **Netlify**, which we have set up to auto-deploy when the main branch of this repository is updated.
 
 ---
