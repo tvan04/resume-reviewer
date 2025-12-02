@@ -528,7 +528,7 @@ export function ResumeViewScreen({ user, resumes }: ResumeViewScreenProps) {
                       data={resume.downloadURL}
                       type="application/pdf"
                       width="100%"
-                      height="1200px"
+                      height="1280px"
                       className="pointer-events-none"
                       style={{ zIndex: 1, position: "relative" }}
                     />
